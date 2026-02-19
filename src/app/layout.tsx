@@ -1,16 +1,17 @@
 
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Outfit } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LayoutProvider } from '@/contexts/LayoutContext';
-import { LayoutContentWrapper } from '@/components/layout/LayoutContentWrapper'; // Import the new component
+import { LayoutContentWrapper } from '@/components/layout/LayoutContentWrapper';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' });
 
 export const metadata: Metadata = {
-  title: 'AI Quiz Maker',
-  description: 'Generate MCQs and test your knowledge with AI!',
+  title: 'AI Quiz Maker — Smart Quizzes, Instant Feedback',
+  description: 'Create AI-powered MCQ quizzes instantly. Test your knowledge with smart question generation, detailed analytics, and personalized study guides.',
+  keywords: ['AI quiz', 'quiz maker', 'MCQ generator', 'study tool', 'AI education'],
 };
 
 export default function RootLayout({
@@ -19,10 +20,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${outfit.variable} dark`}>
       <body className="font-sans antialiased">
         <AuthProvider>
-          <LayoutProvider> {/* My LayoutProvider */}
+          <LayoutProvider>
             <LayoutContentWrapper>{children}</LayoutContentWrapper>
           </LayoutProvider>
         </AuthProvider>

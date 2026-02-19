@@ -7,7 +7,7 @@ import type { AnalyzeQuizPerformanceOutput } from '@/ai/flows/analyze-quiz-perfo
 import { saveQuiz } from '@/services/quizService';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, XCircle, Lightbulb, BarChart3, Repeat, Info, Download, FileText, Loader2, RefreshCw, Eye, ChevronLeft } from 'lucide-react';
+import { CheckCircle2, XCircle, Lightbulb, BarChart3, Repeat, Info, Download, FileText, Loader2, RefreshCw, Eye, ChevronLeft, Trophy, TrendingUp, AlertCircle, Sparkles, ArrowRight } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Link from 'next/link';
@@ -25,7 +25,7 @@ interface ResultsDisplayProps {
   analysis: AnalyzeQuizPerformanceOutput | null;
   isLoadingAnalysis: boolean;
   topic: string;
-  quizDataForRetake: GeneratedQuizData | null; 
+  quizDataForRetake: GeneratedQuizData | null;
 }
 
 export function ResultsDisplay({
@@ -43,18 +43,32 @@ export function ResultsDisplay({
   const { toast } = useToast();
   const router = useRouter();
 
+  const correctCount = questionsAttempted.filter(q => q.studentAnswerIndex === q.correctAnswerIndex).length;
+  const incorrectCount = questionsAttempted.filter(q => q.studentAnswerIndex !== q.correctAnswerIndex && q.studentAnswerIndex !== null).length;
+  const skippedCount = questionsAttempted.filter(q => q.studentAnswerIndex === null).length;
+
   const getOptionClass = (qIndex: number, optionIndex: number) => {
     const attempt = questionsAttempted[qIndex];
     if (optionIndex === attempt.correctAnswerIndex) {
-      return 'text-green-600 font-semibold';
+      return 'text-emerald-400 font-semibold';
     }
     if (optionIndex === attempt.studentAnswerIndex && optionIndex !== attempt.correctAnswerIndex) {
-      return 'text-red-600 line-through';
+      return 'text-red-400 line-through';
     }
     return '';
   };
-  
-  const scoreColor = score >= 70 ? 'text-green-500' : score >= 40 ? 'text-yellow-500' : 'text-red-500';
+
+  const getScoreColor = () => {
+    if (score >= 80) return 'from-emerald-400 to-green-500';
+    if (score >= 50) return 'from-amber-400 to-yellow-500';
+    return 'from-red-400 to-rose-500';
+  };
+
+  const getScoreEmoji = () => {
+    if (score >= 80) return '🎉';
+    if (score >= 50) return '👍';
+    return '💪';
+  };
 
   const handleGenerateRevisitPdf = async () => {
     setIsGeneratingRevisitPdf(true);
@@ -83,11 +97,11 @@ export function ResultsDisplay({
           studentAnswerIndex: q.studentAnswerIndex,
         }))
       };
-      
+
       const revisitData: RevisitMaterialOutput = await generateRevisitMaterial(revisitInput);
 
       const doc = new jsPDF();
-      let yPos = 20; 
+      let yPos = 20;
       const pageHeight = doc.internal.pageSize.height;
       const margin = 15;
       const lineSpacing = 7;
@@ -109,7 +123,7 @@ export function ResultsDisplay({
       yPos += lineSpacing * 1.5;
 
       for (const section of revisitData.sections) {
-        if (yPos > pageHeight - margin * 3) { 
+        if (yPos > pageHeight - margin * 3) {
           doc.addPage();
           yPos = margin;
         }
@@ -119,23 +133,23 @@ export function ResultsDisplay({
         const questionLines = doc.splitTextToSize(`Question: ${section.question}`, doc.internal.pageSize.width - margin * 2);
         doc.text(questionLines, margin, yPos);
         yPos += questionLines.length * lineSpacing;
-        
+
         doc.setFont(undefined, 'normal');
         doc.setFontSize(10);
 
         const correctAnswerText = `Correct Answer: ${section.correctAnswer}`;
         const studentAnswerText = `Your Answer: ${section.studentAnswer || "Skipped"}`;
-        
+
         const caLines = doc.splitTextToSize(correctAnswerText, doc.internal.pageSize.width - margin * 2);
         doc.text(caLines, margin, yPos);
         yPos += caLines.length * (lineSpacing - 2);
 
         if (section.studentAnswer !== section.correctAnswer) {
-             const saLines = doc.splitTextToSize(studentAnswerText, doc.internal.pageSize.width - margin * 2);
-             doc.text(saLines, margin, yPos);
-             yPos += saLines.length * (lineSpacing - 2);
+          const saLines = doc.splitTextToSize(studentAnswerText, doc.internal.pageSize.width - margin * 2);
+          doc.text(saLines, margin, yPos);
+          yPos += saLines.length * (lineSpacing - 2);
         }
-        yPos += (lineSpacing -2);
+        yPos += (lineSpacing - 2);
 
 
         doc.setFontSize(11);
@@ -144,14 +158,14 @@ export function ResultsDisplay({
         yPos += lineSpacing;
 
         doc.setFont(undefined, 'normal');
-        const explanationLines = doc.splitTextToSize(section.detailedExplanation, doc.internal.pageSize.width - margin * 2 - 5); // -5 for slight indent
+        const explanationLines = doc.splitTextToSize(section.detailedExplanation, doc.internal.pageSize.width - margin * 2 - 5);
         doc.text(explanationLines, margin + 5, yPos);
         yPos += explanationLines.length * (lineSpacing - 1) + paragraphSpacing;
 
         if (section !== revisitData.sections[revisitData.sections.length - 1]) {
-           if (yPos > pageHeight - margin * 2) { doc.addPage(); yPos = margin; }
-           doc.setDrawColor(200, 200, 200); 
-           doc.line(margin, yPos - (paragraphSpacing / 2), doc.internal.pageSize.width - margin, yPos - (paragraphSpacing / 2));
+          if (yPos > pageHeight - margin * 2) { doc.addPage(); yPos = margin; }
+          doc.setDrawColor(200, 200, 200);
+          doc.line(margin, yPos - (paragraphSpacing / 2), doc.internal.pageSize.width - margin, yPos - (paragraphSpacing / 2));
         }
       }
 
@@ -188,7 +202,6 @@ export function ResultsDisplay({
     setIsReattempting(true);
 
     try {
-      // Ensure quizDataForRetake.questions exists and is an array
       if (!quizDataForRetake.questions || !Array.isArray(quizDataForRetake.questions)) {
         throw new Error("Invalid questions data in quizDataForRetake.");
       }
@@ -199,7 +212,7 @@ export function ResultsDisplay({
       const reattemptQuestions = shuffledQuestionOrder.map(q => {
         if (!q.options || !Array.isArray(q.options) || typeof q.correctAnswerIndex !== 'number' || q.correctAnswerIndex < 0 || q.correctAnswerIndex >= q.options.length) {
           console.warn("Skipping malformed question during re-attempt shuffle:", q);
-          return q; // Or handle more gracefully, e.g., by filtering out malformed questions
+          return q;
         }
         const correctAnswerText = q.options[q.correctAnswerIndex];
         const shuffledOptions = shuffleArray([...q.options]);
@@ -215,14 +228,8 @@ export function ResultsDisplay({
         topic: quizDataForRetake.topic,
         questions: reattemptQuestions,
         durationMinutes: quizDataForRetake.durationMinutes,
-        // userId will be set by saveQuiz if user is logged in
       };
 
-      // Ensure user is passed to saveQuiz if available (though saveQuiz can handle null)
-      // const currentUserId = quizDataForRetake.userId || null; 
-      // saveQuiz will handle getting current user from AuthContext if needed, or you can pass it.
-      // For simplicity, saveQuiz can be modified to take userId or get it from context. Assuming it does.
-      
       const newRetakeQuizId = await saveQuiz(newQuizDataForFirestore, quizDataForRetake.userId || null);
 
       toast({
@@ -231,163 +238,221 @@ export function ResultsDisplay({
       });
       router.push(`/exam/${newRetakeQuizId}`);
     } catch (error) {
-        console.error("Error saving re-attempt quiz:", error);
-        toast({
-            title: "Re-attempt Failed",
-            description: (error as Error).message || "Could not prepare the quiz for re-attempt. Please try again.",
-            variant: "destructive",
-        });
+      console.error("Error saving re-attempt quiz:", error);
+      toast({
+        title: "Re-attempt Failed",
+        description: (error as Error).message || "Could not prepare the quiz for re-attempt. Please try again.",
+        variant: "destructive",
+      });
     } finally {
-        setIsReattempting(false);
+      setIsReattempting(false);
     }
   };
 
 
   return (
-    <div className="space-y-8">
-      <Card className="w-full shadow-xl overflow-hidden">
-        <CardHeader className="bg-secondary/50 p-6 text-center">
-           <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
-             <BarChart3 className="h-12 w-12 text-primary" />
-           </div>
-          <CardTitle className="text-4xl font-bold">Quiz Results</CardTitle>
-          <CardDescription className="text-xl text-muted-foreground pt-1">Topic: {topic}</CardDescription>
+    <div className="space-y-8 animate-fade-in-up">
+      <div className="fixed inset-0 mesh-gradient-bg pointer-events-none -z-10" />
+
+      {/* Score Card */}
+      <Card className="w-full glass-card overflow-hidden gradient-border">
+        <div className="h-1.5 w-full bg-gradient-to-r from-primary via-purple-500 to-accent" />
+        <CardHeader className="text-center pt-10 pb-6">
+          <div className="text-5xl mb-4">{getScoreEmoji()}</div>
+          <CardTitle className="text-3xl md:text-4xl font-bold">Quiz Results</CardTitle>
+          <CardDescription className="text-base text-muted-foreground pt-1">Topic: <span className="font-semibold text-foreground">{topic}</span></CardDescription>
         </CardHeader>
-        <CardContent className="p-6 md:p-8 space-y-6">
-          <div className="text-center space-y-2">
-            <p className="text-2xl font-medium text-muted-foreground">Your Score</p>
-            <p className={`text-7xl font-bold ${scoreColor}`}>{score.toFixed(0)}%</p>
-            <Progress value={score} className="w-full max-w-md mx-auto h-4 mt-2" />
+        <CardContent className="px-6 md:px-10 pb-8 space-y-8">
+          {/* Score display */}
+          <div className="flex flex-col items-center">
+            <div className="relative h-40 w-40 mb-4">
+              <svg className="h-full w-full -rotate-90" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/50" />
+                <circle
+                  cx="60" cy="60" r="52" fill="none"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  strokeDasharray={`${(score / 100) * 327} 327`}
+                  className={`transition-all duration-1000 ease-out`}
+                  style={{
+                    stroke: score >= 80 ? 'hsl(160, 84%, 39%)' : score >= 50 ? 'hsl(38, 92%, 50%)' : 'hsl(0, 72%, 51%)'
+                  }}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className={`text-4xl font-bold bg-gradient-to-r ${getScoreColor()} bg-clip-text text-transparent`}>
+                  {score.toFixed(0)}%
+                </span>
+                <span className="text-xs text-muted-foreground mt-0.5">Score</span>
+              </div>
+            </div>
           </div>
 
+          {/* Stats grid */}
+          <div className="grid grid-cols-3 gap-3 max-w-md mx-auto">
+            <div className="p-4 rounded-2xl bg-emerald-500/10 text-center">
+              <CheckCircle2 className="h-5 w-5 text-emerald-400 mx-auto mb-1.5" />
+              <p className="text-2xl font-bold text-emerald-400">{correctCount}</p>
+              <p className="text-xs text-muted-foreground">Correct</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-red-500/10 text-center">
+              <XCircle className="h-5 w-5 text-red-400 mx-auto mb-1.5" />
+              <p className="text-2xl font-bold text-red-400">{incorrectCount}</p>
+              <p className="text-xs text-muted-foreground">Incorrect</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-amber-500/10 text-center">
+              <AlertCircle className="h-5 w-5 text-amber-400 mx-auto mb-1.5" />
+              <p className="text-2xl font-bold text-amber-400">{skippedCount}</p>
+              <p className="text-xs text-muted-foreground">Skipped</p>
+            </div>
+          </div>
+
+          {/* AI Analysis */}
           {isLoadingAnalysis && !analysis && (
-            <div className="text-center py-6">
-              <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary mb-2" />
-              <p className="text-muted-foreground">AI is analyzing your performance...</p>
+            <div className="text-center py-8">
+              <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full glass-card">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="text-sm text-muted-foreground">AI is analyzing your performance...</span>
+              </div>
             </div>
           )}
 
           {analysis && (
-            <Card className="bg-secondary/30">
-              <CardHeader>
-                <CardTitle className="text-2xl flex items-center"><Lightbulb className="mr-2 h-6 w-6 text-primary" /> AI Performance Analysis</CardTitle>
+            <Card className="glass-card overflow-hidden">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                  </div>
+                  AI Performance Analysis
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4 text-base">
-                <div>
-                  <h4 className="font-semibold text-primary">Strengths:</h4>
-                  <p className="whitespace-pre-wrap">{analysis.strengths}</p>
+              <CardContent className="space-y-5 text-sm">
+                <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
+                  <h4 className="font-semibold text-emerald-400 mb-2 flex items-center gap-2">
+                    <Trophy className="h-4 w-4" /> Strengths
+                  </h4>
+                  <p className="whitespace-pre-wrap text-muted-foreground leading-relaxed">{analysis.strengths}</p>
                 </div>
-                <div>
-                  <h4 className="font-semibold text-destructive">Areas for Improvement:</h4>
-                  <p className="whitespace-pre-wrap">{analysis.weaknesses}</p>
+                <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                  <h4 className="font-semibold text-amber-400 mb-2 flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" /> Areas for Improvement
+                  </h4>
+                  <p className="whitespace-pre-wrap text-muted-foreground leading-relaxed">{analysis.weaknesses}</p>
                 </div>
-                <div>
-                  <h4 className="font-semibold text-accent-foreground">Suggestions:</h4>
-                  <p className="whitespace-pre-wrap">{analysis.suggestions}</p>
+                <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
+                  <h4 className="font-semibold text-primary mb-2 flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4" /> Suggestions
+                  </h4>
+                  <p className="whitespace-pre-wrap text-muted-foreground leading-relaxed">{analysis.suggestions}</p>
                 </div>
               </CardContent>
             </Card>
           )}
-          
-          <div className="mt-8 pt-6 border-t">
-             <h3 className="text-2xl font-semibold mb-4 text-center">Study & Review</h3>
-             <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-                {!revisitPdfUrl ? (
-                  <Button 
-                    onClick={handleGenerateRevisitPdf} 
-                    disabled={isGeneratingRevisitPdf || questionsAttempted.filter(q => q.studentAnswerIndex !== q.correctAnswerIndex).length === 0}
-                    size="lg"
-                  >
-                    {isGeneratingRevisitPdf ? (
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    ) : (
-                      <FileText className="mr-2 h-5 w-5" />
-                    )}
-                    Generate Revisit PDF
+
+          {/* Study & Review */}
+          <div className="pt-4 border-t border-border/30">
+            <h3 className="text-lg font-bold mb-4 text-center">Study & Review</h3>
+            <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
+              {!revisitPdfUrl ? (
+                <Button
+                  onClick={handleGenerateRevisitPdf}
+                  disabled={isGeneratingRevisitPdf || questionsAttempted.filter(q => q.studentAnswerIndex !== q.correctAnswerIndex).length === 0}
+                  size="lg"
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                >
+                  {isGeneratingRevisitPdf ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileText className="mr-2 h-4 w-4" />
+                  )}
+                  Generate Revisit PDF
+                </Button>
+              ) : (
+                <a href={revisitPdfUrl} download={`${topic.replace(/\s+/g, '_')}_Revisit_Guide.pdf`}>
+                  <Button size="lg" className="bg-gradient-to-r from-primary to-purple-500 text-white border-0">
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Revisit PDF
                   </Button>
-                ) : (
-                  <a href={revisitPdfUrl} download={`${topic.replace(/\s+/g, '_')}_Revisit_Guide.pdf`}>
-                    <Button size="lg" variant="default">
-                      <Download className="mr-2 h-5 w-5" />
-                      Download Revisit PDF
-                    </Button>
-                  </a>
-                )}
-                {questionsAttempted.filter(q => q.studentAnswerIndex !== q.correctAnswerIndex).length === 0 && !isGeneratingRevisitPdf && (
-                  <p className="text-sm text-green-600">All questions answered correctly! No revisit PDF needed.</p>
-                )}
-             </div>
+                </a>
+              )}
+              {questionsAttempted.filter(q => q.studentAnswerIndex !== q.correctAnswerIndex).length === 0 && !isGeneratingRevisitPdf && (
+                <p className="text-sm text-emerald-400 font-medium">All questions answered correctly! No revisit PDF needed. 🎉</p>
+              )}
+            </div>
           </div>
 
 
           {viewMode === 'summary' && (
-            <div className="text-center mt-8">
-              <Button onClick={() => setViewMode('detailed')} size="lg" variant="outline">
-                <Eye className="mr-2 h-5 w-5" />
+            <div className="text-center pt-2">
+              <Button onClick={() => setViewMode('detailed')} size="lg" variant="outline" className="group">
+                <Eye className="mr-2 h-4 w-4" />
                 View Detailed Question Review
+                <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </Button>
             </div>
           )}
 
           {viewMode === 'detailed' && (
-            <div>
-              <div className="flex justify-between items-center mb-4 mt-8">
-                <h3 className="text-2xl font-semibold">Detailed Question Review</h3>
-                <Button onClick={() => setViewMode('summary')} variant="outline">
-                  <ChevronLeft className="mr-2 h-5 w-5" />
-                  Back to Summary
+            <div className="animate-fade-in">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold">Detailed Question Review</h3>
+                <Button onClick={() => setViewMode('summary')} variant="ghost" size="sm">
+                  <ChevronLeft className="mr-1 h-4 w-4" />
+                  Back
                 </Button>
               </div>
-              <Accordion type="single" collapsible className="w-full">
+              <Accordion type="single" collapsible className="w-full space-y-2">
                 {questionsAttempted.map((attempt, index) => (
-                  <AccordionItem value={`item-${index}`} key={index}>
-                    <AccordionTrigger className="text-lg hover:no-underline">
-                      <div className="flex items-center text-left">
+                  <AccordionItem value={`item-${index}`} key={index} className="glass-card rounded-xl overflow-hidden border-0">
+                    <AccordionTrigger className="text-base hover:no-underline px-4 py-3">
+                      <div className="flex items-center text-left gap-3">
                         {attempt.studentAnswerIndex === attempt.correctAnswerIndex ? (
-                          <CheckCircle2 className="h-6 w-6 mr-3 text-green-500 flex-shrink-0" />
+                          <div className="flex-shrink-0 h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                          </div>
                         ) : (
-                          <XCircle className="h-6 w-6 mr-3 text-red-500 flex-shrink-0" />
+                          <div className="flex-shrink-0 h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                            <XCircle className="h-4 w-4 text-red-400" />
+                          </div>
                         )}
-                        <span className="flex-1">Question {index + 1}: {attempt.question.length > 50 ? attempt.question.substring(0,50) + "..." : attempt.question}</span>
+                        <span className="flex-1 text-sm font-medium">Q{index + 1}: {attempt.question.length > 50 ? attempt.question.substring(0, 50) + "..." : attempt.question}</span>
                       </div>
                     </AccordionTrigger>
-                    <AccordionContent className="px-4 py-2 space-y-3 bg-slate-50 dark:bg-slate-800 rounded-b-md">
-                      <p className="text-base font-medium mb-2">{attempt.question}</p>
-                      <ul className="space-y-1 list-inside">
+                    <AccordionContent className="px-5 py-4 space-y-3 bg-muted/10">
+                      <p className="text-sm font-medium mb-3">{attempt.question}</p>
+                      <ul className="space-y-1.5">
                         {attempt.options.map((option, optIndex) => (
-                          <li key={optIndex} className={`flex items-start ${getOptionClass(index, optIndex)}`}>
-                            {optIndex === attempt.correctAnswerIndex && <CheckCircle2 className="h-5 w-5 mr-2 mt-0.5 text-green-500 flex-shrink-0" />}
-                            {optIndex === attempt.studentAnswerIndex && optIndex !== attempt.correctAnswerIndex && <XCircle className="h-5 w-5 mr-2 mt-0.5 text-red-500 flex-shrink-0" />}
-                            {! (optIndex === attempt.correctAnswerIndex || (optIndex === attempt.studentAnswerIndex && optIndex !== attempt.correctAnswerIndex)) && <div className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0"></div> }
+                          <li key={optIndex} className={`flex items-start text-sm ${getOptionClass(index, optIndex)}`}>
+                            {optIndex === attempt.correctAnswerIndex && <CheckCircle2 className="h-4 w-4 mr-2 mt-0.5 text-emerald-400 flex-shrink-0" />}
+                            {optIndex === attempt.studentAnswerIndex && optIndex !== attempt.correctAnswerIndex && <XCircle className="h-4 w-4 mr-2 mt-0.5 text-red-400 flex-shrink-0" />}
+                            {!(optIndex === attempt.correctAnswerIndex || (optIndex === attempt.studentAnswerIndex && optIndex !== attempt.correctAnswerIndex)) && <div className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0"></div>}
                             <span>{String.fromCharCode(65 + optIndex)}. {option}</span>
                           </li>
                         ))}
                       </ul>
                       {attempt.studentAnswerIndex !== attempt.correctAnswerIndex && attempt.studentAnswerIndex !== null && (
-                        <p className="text-sm text-muted-foreground">Your answer: <span className="font-semibold">{attempt.options[attempt.studentAnswerIndex!]}</span></p>
+                        <p className="text-xs text-muted-foreground">Your answer: <span className="font-semibold text-red-400">{attempt.options[attempt.studentAnswerIndex!]}</span></p>
                       )}
                       {attempt.studentAnswerIndex === null && (
-                        <p className="text-sm text-yellow-600 font-semibold">You did not answer this question.</p>
+                        <p className="text-xs text-amber-400 font-semibold">You did not answer this question.</p>
                       )}
-                      <p className="text-sm text-green-700">Correct answer: <span className="font-semibold">{attempt.options[attempt.correctAnswerIndex]}</span></p>
-                      
+                      <p className="text-xs text-emerald-400">Correct answer: <span className="font-semibold">{attempt.options[attempt.correctAnswerIndex]}</span></p>
+
                       {analysis && analysis.questionExplanations && analysis.questionExplanations[index] && (
-                        <Card className="mt-4 bg-primary/5 dark:bg-primary/10">
-                          <CardHeader className="pb-2 pt-4">
-                            <CardTitle className="text-md flex items-center text-primary">
-                              <Info className="mr-2 h-5 w-5" />
-                              AI Explanation
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-sm text-foreground/90">
-                            <p className="whitespace-pre-wrap">{analysis.questionExplanations[index]}</p>
-                          </CardContent>
-                        </Card>
+                        <div className="mt-3 p-3 rounded-xl bg-primary/5 border border-primary/10">
+                          <p className="text-xs font-semibold text-primary flex items-center gap-1.5 mb-1.5">
+                            <Info className="h-3.5 w-3.5" />
+                            AI Explanation
+                          </p>
+                          <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{analysis.questionExplanations[index]}</p>
+                        </div>
                       )}
                       {isLoadingAnalysis && !(analysis && analysis.questionExplanations && analysis.questionExplanations[index]) && (
-                        <div className="text-left py-3">
-                          <Loader2 className="inline-block h-5 w-5 animate-spin text-primary mr-1" />
-                          <span className="text-sm text-muted-foreground">Loading explanation...</span>
+                        <div className="flex items-center gap-2 py-2">
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                          <span className="text-xs text-muted-foreground">Loading explanation...</span>
                         </div>
                       )}
                     </AccordionContent>
@@ -397,15 +462,20 @@ export function ResultsDisplay({
             </div>
           )}
         </CardContent>
-        <CardFooter className="p-6 flex flex-col sm:flex-row justify-center gap-4">
+        <CardFooter className="px-6 pb-8 flex flex-col sm:flex-row justify-center gap-3">
           <Link href="/">
-            <Button size="lg" variant="outline" disabled={isReattempting}>
-              <Repeat className="mr-2 h-5 w-5" />
+            <Button size="lg" variant="outline" disabled={isReattempting} className="w-full sm:w-auto">
+              <Repeat className="mr-2 h-4 w-4" />
               Create Another Quiz
             </Button>
           </Link>
-          <Button size="lg" onClick={handleReattemptQuiz} disabled={!quizDataForRetake || isReattempting}>
-            {isReattempting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <RefreshCw className="mr-2 h-5 w-5" /> }
+          <Button
+            size="lg"
+            onClick={handleReattemptQuiz}
+            disabled={!quizDataForRetake || isReattempting}
+            className="w-full sm:w-auto bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90 text-white border-0 shadow-lg shadow-primary/25"
+          >
+            {isReattempting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             {isReattempting ? "Preparing..." : "Re-attempt This Quiz"}
           </Button>
         </CardFooter>

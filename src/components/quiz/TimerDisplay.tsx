@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { TimerIcon } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { TimerIcon, AlertTriangle } from 'lucide-react';
 
 interface TimerDisplayProps {
   initialDurationSeconds: number;
@@ -32,18 +31,29 @@ export function TimerDisplay({ initialDurationSeconds, onTimeUp, isPaused }: Tim
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
+  const isLowTime = timeLeft <= 60;
+  const isCritical = timeLeft <= 30;
+  const totalSeconds = initialDurationSeconds;
+  const pct = totalSeconds > 0 ? ((totalSeconds - timeLeft) / totalSeconds) * 100 : 0;
 
   return (
-    <Card className="w-full md:w-auto shadow-md">
-      <CardContent className="p-3 md:p-4">
-        <div className="flex items-center justify-center text-lg md:text-xl font-semibold text-primary">
-          <TimerIcon className="mr-2 h-5 w-5 md:h-6 md:w-6" />
-          <span>Time Left: </span>
-          <span className="ml-1 tabular-nums">
-            {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-          </span>
-        </div>
-      </CardContent>
-    </Card>
+    <div className={`inline-flex items-center gap-3 px-5 py-3 rounded-2xl glass-card transition-all duration-500 ${isCritical ? 'border-red-500/50 pulse-glow' : isLowTime ? 'border-amber-500/30' : ''}`}>
+      <div className={`flex-shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors duration-300 ${isCritical ? 'bg-red-500/15 text-red-400' : isLowTime ? 'bg-amber-500/15 text-amber-400' : 'bg-primary/10 text-primary'}`}>
+        {isCritical ? <AlertTriangle className="h-5 w-5" /> : <TimerIcon className="h-5 w-5" />}
+      </div>
+      <div className="flex flex-col">
+        <span className="text-xs text-muted-foreground font-medium">Time Left</span>
+        <span className={`text-xl font-bold tabular-nums tracking-tight transition-colors duration-300 ${isCritical ? 'text-red-400' : isLowTime ? 'text-amber-400' : 'text-foreground'}`}>
+          {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+        </span>
+      </div>
+      {/* Tiny progress bar */}
+      <div className="w-16 h-1.5 rounded-full bg-muted/50 overflow-hidden ml-1">
+        <div
+          className={`h-full rounded-full transition-all duration-1000 ease-linear ${isCritical ? 'bg-red-400' : isLowTime ? 'bg-amber-400' : 'bg-primary'}`}
+          style={{ width: `${100 - pct}%` }}
+        />
+      </div>
+    </div>
   );
 }

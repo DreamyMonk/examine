@@ -1,4 +1,6 @@
 
+export type QuizDifficulty = 'basic' | 'hard';
+
 export interface McqQuestion {
   question: string;
   options: string[];
@@ -10,6 +12,7 @@ export interface GeneratedQuizData {
   topic: string;
   questions: McqQuestion[];
   durationMinutes: number; // Quiz duration in minutes
+  difficulty?: QuizDifficulty; // Quiz difficulty level
   userId?: string | null; // Optional: ID of the user who created/took the quiz
   createdAt?: any; // Firestore Timestamp
 }

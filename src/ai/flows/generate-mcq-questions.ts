@@ -10,12 +10,13 @@
  * - GenerateMcqQuestionsOutput - The output type for the generateMcqQuestions function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
 
 const GenerateMcqQuestionsInputSchema = z.object({
   topic: z.string().describe('The topic for which to generate MCQs.'),
   numberOfQuestions: z.number().int().min(1).describe('The exact number of MCQs to generate.'),
+  difficulty: z.enum(['basic', 'hard']).optional().default('basic').describe('The difficulty level of the questions. "basic" for standard recall questions, "hard" for advanced analytical questions.'),
 });
 export type GenerateMcqQuestionsInput = z.infer<typeof GenerateMcqQuestionsInputSchema>;
 
@@ -41,10 +42,27 @@ export async function generateMcqQuestions(input: GenerateMcqQuestionsInput): Pr
 
 const generateMcqQuestionsPrompt = ai.definePrompt({
   name: 'generateMcqQuestionsPrompt',
-  input: {schema: GenerateMcqQuestionsInputSchema},
-  output: {schema: GenerateMcqQuestionsOutputSchema},
+  input: { schema: GenerateMcqQuestionsInputSchema },
+  output: { schema: GenerateMcqQuestionsOutputSchema },
   prompt: `You are an expert in creating multiple-choice questions (MCQs).
   Given the topic: {{{topic}}}, generate exactly {{{numberOfQuestions}}} MCQs.
+
+  DIFFICULTY LEVEL: {{difficulty}}
+
+  If the difficulty is "hard", follow these HARD MODE instructions:
+  - Create questions that require deep analytical thinking, application of concepts, and critical reasoning
+  - Include questions that test edge cases, exceptions, and nuanced understanding
+  - Use complex scenarios, multi-step reasoning, and questions that require connecting multiple concepts
+  - Make distractors (wrong options) very plausible and closely related to the correct answer
+  - Include questions that test understanding of WHY something is true, not just WHAT is true
+  - Questions should challenge even students who have studied the topic well
+
+  If the difficulty is "basic", follow these BASIC MODE instructions:
+  - Create straightforward questions that test recall and basic understanding
+  - Questions should be clear and direct
+  - Options should be distinguishable with reasonable study
+  - Focus on key facts, definitions, and fundamental concepts
+
   Each question must have exactly 4 possible answer options, and only one correct answer.
   Return the questions in JSON format, with a "questions" array.
   Each question object should have the following keys:
@@ -54,7 +72,6 @@ const generateMcqQuestionsPrompt = ai.definePrompt({
   Ensure that the correct answer is plausible and related to the question.
   Make sure that the options are distinct, and that only one is correct.
   Do not repeat questions. Ensure you generate exactly {{{numberOfQuestions}}} questions as requested.
-  The generated questions should require recall of knowledge, not general knowledge or common sense.
   `,
 });
 
@@ -65,17 +82,10 @@ const generateMcqQuestionsFlow = ai.defineFlow(
     outputSchema: GenerateMcqQuestionsOutputSchema,
   },
   async input => {
-    const {output} = await generateMcqQuestionsPrompt(input);
-    // Ensure the output matches the requested number of questions if possible, or handle discrepancies.
-    // For now, we trust the LLM to follow instructions based on the prompt.
-    // If output is null or questions array is empty, it indicates an issue with generation.
+    const { output } = await generateMcqQuestionsPrompt(input);
     if (!output || !output.questions) {
-        // Fallback or error handling if needed, though schema validation should catch some issues.
-        // For robust handling, one might check output.questions.length here.
-        // Returning an empty array or throwing an error could be options.
-        // For now, let's assume the LLM adheres to the prompt or schema validation handles errors.
-        console.warn('AI did not return questions as expected.');
-        return { questions: [] };
+      console.warn('AI did not return questions as expected.');
+      return { questions: [] };
     }
     return output;
   }

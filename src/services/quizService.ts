@@ -1,7 +1,6 @@
-
 import { db } from '@/lib/firebase'; // db can be null
 import { collection, addDoc, getDoc, doc, Timestamp, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import type { McqQuestion, GeneratedQuizData } from '@/types/quiz';
+import type { McqQuestion, GeneratedQuizData, QuizDifficulty } from '@/types/quiz';
 import { subDays } from 'date-fns';
 
 // Type for data being saved to Firestore (without the client-side 'id' which becomes the doc ID)
@@ -9,8 +8,9 @@ interface QuizDataToSave {
   topic: string;
   questions: McqQuestion[];
   durationMinutes: number;
+  difficulty?: QuizDifficulty;
   createdAt: Timestamp;
-  userId: string | null; 
+  userId: string | null;
 }
 
 function formatFirebaseError(error: any): string {
@@ -61,7 +61,7 @@ export async function getQuizById(quizId: string): Promise<GeneratedQuizData | n
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-      const data = docSnap.data() as QuizDataToSave; 
+      const data = docSnap.data() as QuizDataToSave;
       console.log("Quiz fetched successfully from Firestore. ID:", docSnap.id, "Data:", data);
       if (!data.questions || !data.topic || typeof data.durationMinutes === 'undefined') {
         console.error("Firestore data for quiz", quizId, "is missing essential fields:", data);
@@ -72,6 +72,7 @@ export async function getQuizById(quizId: string): Promise<GeneratedQuizData | n
         topic: data.topic,
         questions: data.questions,
         durationMinutes: data.durationMinutes,
+        difficulty: data.difficulty,
         userId: data.userId || null,
         createdAt: data.createdAt,
       } as GeneratedQuizData;
@@ -113,6 +114,7 @@ export async function getRecentQuizzesByUserId(userId: string, daysLimit: number
           topic: data.topic,
           questions: data.questions,
           durationMinutes: data.durationMinutes,
+          difficulty: data.difficulty,
           userId: data.userId,
           createdAt: data.createdAt,
         });

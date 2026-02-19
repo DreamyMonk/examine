@@ -10,17 +10,16 @@ import { QuizHistorySidebarContent } from '@/components/layout/QuizHistorySideba
 
 export function LayoutContentWrapper({ children }: { children: React.ReactNode }) {
   const { isSidebarVisible } = useLayout();
-  console.log("LayoutContentWrapper: isSidebarVisible from context:", isSidebarVisible);
 
   return (
-    <SidebarProvider> {/* ShadCN's SidebarProvider */}
+    <SidebarProvider>
       {isSidebarVisible && (
-        <Sidebar>
+        <Sidebar className="border-r border-border/50">
           <QuizHistorySidebarContent />
         </Sidebar>
       )}
       <SidebarInset>
-        <Header /> {/* Header also consumes isSidebarVisible */}
+        <Header />
         <main className="container mx-auto p-4 md:p-8">
           {children}
         </main>
