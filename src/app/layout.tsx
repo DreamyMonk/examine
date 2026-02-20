@@ -1,17 +1,16 @@
 
 import type { Metadata } from 'next';
-import { Outfit } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { LayoutProvider } from '@/contexts/LayoutContext';
-import { LayoutContentWrapper } from '@/components/layout/LayoutContentWrapper';
+import { Toaster } from '@/components/ui/toaster';
 
-const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' });
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'AI Quiz Maker — Smart Quizzes, Instant Feedback',
-  description: 'Create AI-powered MCQ quizzes instantly. Test your knowledge with smart question generation, detailed analytics, and personalized study guides.',
-  keywords: ['AI quiz', 'quiz maker', 'MCQ generator', 'study tool', 'AI education'],
+  title: 'ExamDesk — Professional Online Examination System',
+  description: 'Secure online examination platform with proctoring, real-time monitoring, and comprehensive exam management.',
+  keywords: ['exam system', 'online exam', 'proctoring', 'examination platform'],
 };
 
 export default function RootLayout({
@@ -20,12 +19,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${outfit.variable} dark`}>
+    <html lang="en" className={inter.variable}>
       <body className="font-sans antialiased">
         <AuthProvider>
-          <LayoutProvider>
-            <LayoutContentWrapper>{children}</LayoutContentWrapper>
-          </LayoutProvider>
+          <main className="min-h-screen">
+            {children}
+          </main>
+          <Toaster />
         </AuthProvider>
       </body>
     </html>

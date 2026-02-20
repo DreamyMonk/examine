@@ -4,94 +4,54 @@
 
 @layer base {
   :root {
-    --background: 240 10% 96%;
-    --foreground: 240 10% 20%;
+    --background: 0 0% 100%;
+    --foreground: 220 14% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 20%;
+    --card-foreground: 220 14% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 20%;
+    --popover-foreground: 220 14% 10%;
 
-    --primary: 252 85% 60%;
+    --primary: 220 80% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 252 30% 95%;
-    --secondary-foreground: 252 50% 30%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 14% 30%;
 
-    --muted: 240 10% 92%;
-    --muted-foreground: 240 5% 45%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 10% 46%;
 
-    --accent: 38 95% 60%;
-    --accent-foreground: 38 95% 15%;
+    --accent: 220 14% 96%;
+    --accent-foreground: 220 14% 10%;
 
-    --destructive: 0 75% 55%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 10% 88%;
-    --input: 0 0% 100%;
-    --ring: 252 85% 60%;
+    --border: 220 14% 90%;
+    --input: 220 14% 90%;
+    --ring: 220 80% 50%;
 
-    --chart-1: 252 85% 60%;
-    --chart-2: 38 95% 60%;
-    --chart-3: 160 60% 45%;
-    --chart-4: 340 70% 55%;
-    --chart-5: 200 70% 50%;
-    --radius: 0.625rem;
+    --chart-1: 220 80% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 340 75% 55%;
+    --chart-5: 270 60% 55%;
+    --radius: 0.5rem;
 
-    --sidebar-background: 240 10% 98%;
-    --sidebar-foreground: 240 10% 25%;
-    --sidebar-primary: 252 85% 60%;
+    --sidebar-background: 220 14% 98%;
+    --sidebar-foreground: 220 14% 20%;
+    --sidebar-primary: 220 80% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 10% 94%;
-    --sidebar-accent-foreground: 252 70% 40%;
-    --sidebar-border: 240 10% 88%;
-    --sidebar-ring: 252 85% 60%;
-  }
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 220 14% 10%;
+    --sidebar-border: 220 14% 90%;
+    --sidebar-ring: 220 80% 50%;
 
-  .dark {
-    --background: 240 10% 6%;
-    --foreground: 240 10% 92%;
-
-    --card: 240 10% 8%;
-    --card-foreground: 240 10% 92%;
-
-    --popover: 240 10% 5%;
-    --popover-foreground: 240 10% 92%;
-
-    --primary: 252 85% 65%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 252 30% 15%;
-    --secondary-foreground: 252 40% 80%;
-
-    --muted: 240 10% 14%;
-    --muted-foreground: 240 5% 55%;
-
-    --accent: 38 95% 55%;
-    --accent-foreground: 38 95% 10%;
-
-    --destructive: 0 65% 50%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 240 10% 18%;
-    --input: 240 10% 12%;
-    --ring: 252 85% 65%;
-
-    --chart-1: 252 85% 65%;
-    --chart-2: 38 95% 55%;
-    --chart-3: 160 55% 50%;
-    --chart-4: 340 65% 60%;
-    --chart-5: 200 65% 55%;
-
-    --sidebar-background: 240 10% 7%;
-    --sidebar-foreground: 240 10% 85%;
-    --sidebar-primary: 252 80% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 10% 12%;
-    --sidebar-accent-foreground: 252 70% 65%;
-    --sidebar-border: 240 10% 15%;
-    --sidebar-ring: 252 85% 65%;
+    --success: 160 60% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
   }
 }
 
@@ -115,7 +75,7 @@
   }
 }
 
-/* Custom scrollbar */
+/* Clean scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -136,76 +96,34 @@
 
 @layer utilities {
 
-  /* Glass card */
-  .glass-card {
-    @apply bg-card/80 backdrop-blur-xl border border-white/[0.08] rounded-2xl;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  }
-
-  .dark .glass-card {
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  }
-
-  /* Gradient border wrapper */
-  .gradient-border {
-    position: relative;
-  }
-
-  .gradient-border::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(135deg, hsl(252, 85%, 65%, 0.3), hsl(38, 95%, 55%, 0.15), transparent);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-  }
-
-  /* Mesh gradient background */
-  .mesh-gradient-bg {
-    background:
-      radial-gradient(ellipse at 20% 50%, hsla(252, 85%, 60%, 0.06) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 20%, hsla(38, 95%, 55%, 0.04) 0%, transparent 50%),
-      radial-gradient(ellipse at 50% 80%, hsla(252, 85%, 60%, 0.03) 0%, transparent 50%);
-  }
-
-  /* Dot pattern overlay */
-  .dot-pattern {
-    background-image: radial-gradient(circle, hsl(var(--muted-foreground) / 0.06) 1px, transparent 1px);
-    background-size: 24px 24px;
-  }
-
-  /* Gradient text */
-  .gradient-text {
-    @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, hsl(252, 85%, 65%), hsl(280, 70%, 60%), hsl(38, 95%, 55%));
-  }
-
-  /* Card hover effect */
-  .card-hover {
-    @apply transition-all duration-300;
-  }
-
-  .card-hover:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 40px hsl(var(--primary) / 0.1);
-  }
-
-  /* Animations */
+  /* Subtle animations */
   .animate-fade-in-up {
-    animation: fadeInUp 0.5s ease-out both;
+    animation: fadeInUp 0.4s ease-out both;
   }
 
   .animate-scale-in {
-    animation: scaleIn 0.4s ease-out both;
+    animation: scaleIn 0.3s ease-out both;
   }
 
   .animate-fade-in {
-    animation: fadeIn 0.3s ease-out both;
+    animation: fadeIn 0.25s ease-out both;
+  }
+
+  /* Status indicators */
+  .status-success {
+    @apply text-emerald-600 bg-emerald-50 border-emerald-200;
+  }
+
+  .status-warning {
+    @apply text-amber-600 bg-amber-50 border-amber-200;
+  }
+
+  .status-error {
+    @apply text-red-600 bg-red-50 border-red-200;
+  }
+
+  .status-info {
+    @apply text-blue-600 bg-blue-50 border-blue-200;
   }
 }
 
@@ -213,7 +131,7 @@
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(12px);
   }
 
   to {
@@ -225,7 +143,7 @@
 @keyframes scaleIn {
   from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.97);
   }
 
   to {
@@ -244,36 +162,63 @@
   }
 }
 
-@keyframes float {
-
-  0%,
-  100% {
-    transform: translateY(0px);
-  }
-
-  50% {
-    transform: translateY(-10px);
-  }
+/* Custom utilities */
+.border-3 {
+  border-width: 3px;
 }
 
-@keyframes pulseGlow {
-
-  0%,
-  100% {
-    box-shadow: 0 0 10px hsl(var(--primary) / 0.15);
-  }
-
-  50% {
-    box-shadow: 0 0 25px hsl(var(--primary) / 0.35);
-  }
+/* Rich Text Editor (Quill) */
+.rich-text-editor .ql-toolbar {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.75rem 0.75rem 0 0 !important;
+  background: #f9fafb;
+  padding: 6px 8px !important;
 }
 
-@keyframes shimmer {
-  0% {
-    background-position: -200% center;
-  }
+.rich-text-editor .ql-container {
+  border: 1px solid #e5e7eb !important;
+  border-top: none !important;
+  border-radius: 0 0 0.75rem 0.75rem !important;
+  font-size: 14px;
+  font-family: inherit;
+}
 
-  100% {
-    background-position: 200% center;
+.rich-text-editor .ql-editor {
+  min-height: var(--editor-min-height, 140px);
+  padding: 12px 16px;
+  line-height: 1.6;
+}
+
+.rich-text-editor .ql-editor.ql-blank::before {
+  color: #9ca3af;
+  font-style: normal;
+}
+
+.rich-text-editor .ql-snow .ql-stroke {
+  stroke: #6b7280;
+}
+
+.rich-text-editor .ql-snow .ql-fill,
+.rich-text-editor .ql-snow .ql-stroke.ql-fill {
+  fill: #6b7280;
+}
+
+.rich-text-editor .ql-snow button:hover .ql-stroke,
+.rich-text-editor .ql-snow .ql-picker-label:hover .ql-stroke {
+  stroke: #111827;
+}
+
+.rich-text-editor .ql-snow button.ql-active .ql-stroke {
+  stroke: #2563eb;
+}
+
+.rich-text-editor .ql-snow button.ql-active .ql-fill {
+  fill: #2563eb;
+}
+
+/* Print styles for exam */
+@media print {
+  .no-print {
+    display: none !important;
   }
 }
