@@ -1,10 +1,33 @@
 // ============ EXAM SYSTEM TYPES ============
 
-export type QuestionType = 'mcq' | 'descriptive_2' | 'descriptive_5' | 'descriptive_10';
+export type QuestionType = 'mcq' | 'descriptive_2' | 'descriptive_5' | 'descriptive_10' | 'coding_5' | 'coding_10';
+export type ProgrammingLanguage = 'javascript' | 'python' | 'java';
 
 export interface McqOption {
     text: string;
     isCorrect: boolean;
+}
+
+export interface CodingTestCase {
+    input: string;
+    expectedOutput: string;
+    isSample?: boolean;
+}
+
+export interface CodingExecutionResult {
+    stdout?: string;
+    stderr?: string;
+    compileOutput?: string;
+    passedCount?: number;
+    totalCount?: number;
+    testResults?: Array<{
+        input: string;
+        expectedOutput: string;
+        actualOutput: string;
+        passed: boolean;
+        stderr?: string;
+        compileOutput?: string;
+    }>;
 }
 
 export interface ExamQuestion {
@@ -14,6 +37,9 @@ export interface ExamQuestion {
     marks: number; // 1 for MCQ, 2/5/10 for descriptive
     options?: McqOption[]; // Only for MCQ
     correctAnswer?: string; // For descriptive - model answer
+    codingLanguages?: ProgrammingLanguage[];
+    starterCode?: Partial<Record<ProgrammingLanguage, string>>;
+    testCases?: CodingTestCase[];
 }
 
 export type ExamType = 'practice' | 'scheduled';
@@ -64,6 +90,9 @@ export interface StudentAnswer {
     questionType: QuestionType;
     selectedOptionIndex?: number; // For MCQ
     descriptiveAnswer?: string; // For descriptive
+    codeAnswer?: string; // For coding
+    codeLanguage?: ProgrammingLanguage;
+    codeExecution?: CodingExecutionResult;
     marks: number; // marks for this question
     marksAwarded?: number; // admin can grade descriptive
 }
