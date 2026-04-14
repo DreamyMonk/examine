@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { createExamSet, getExamSets, deleteExamSet, getUserGroups } from '@/services/examService';
-import type { ExamSet, ExamQuestion, UserGroup, QuestionType, ExamType } from '@/types/exam';
+import type { ExamSet, ExamQuestion, UserGroup, QuestionType, ExamType, ProgrammingLanguage } from '@/types/exam';
 import {
     Loader2, PlusCircle, Trash2, FileText, Clock, Hash,
     ChevronDown, ChevronUp, Award, CalendarDays
@@ -55,9 +55,16 @@ export function ExamsTab() {
 
     useEffect(() => { fetchData(); }, []);
 
+    const codingLanguages: ProgrammingLanguage[] = ['javascript', 'python', 'java'];
+    const defaultStarterCode: Record<ProgrammingLanguage, string> = {
+        javascript: `function solve(input) {\n  return input.trim();\n}\n\nconst fs = require("fs");\nconst input = fs.readFileSync(0, "utf8");\nprocess.stdout.write(String(solve(input)));\n`,
+        python: `def solve(input_data: str) -> str:\n    return input_data.strip()\n\nif __name__ == "__main__":\n    import sys\n    input_data = sys.stdin.read()\n    sys.stdout.write(str(solve(input_data)))\n`,
+        java: `import java.io.*;\n\npublic class Main {\n    public static void main(String[] args) throws Exception {\n        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        StringBuilder input = new StringBuilder();\n        String line;\n        while ((line = br.readLine()) != null) {\n            input.append(line);\n            if (br.ready()) input.append("\\n");\n        }\n        System.out.print(input.toString().trim());\n    }\n}\n`,
+    };
+
     // Add question
     const addQuestion = (type: QuestionType) => {
-        const marks = type === 'mcq' ? 1 : type === 'descriptive_2' ? 2 : type === 'descriptive_5' ? 5 : 10;
+        const marks = type === 'mcq' ? 1 : type === 'descriptive_2' ? 2 : type === 'descriptive_5' || type === 'coding_5' ? 5 : 10;
         const newQ: ExamQuestion = {
             id: v4Fallback(),
             type,
@@ -69,6 +76,12 @@ export function ExamsTab() {
                     { text: '', isCorrect: false },
                     { text: '', isCorrect: false },
                     { text: '', isCorrect: false },
+                ],
+            } : type === 'coding_5' || type === 'coding_10' ? {
+                codingLanguages,
+                starterCode: defaultStarterCode,
+                testCases: [
+                    { input: '', expectedOutput: '', isSample: true },
                 ],
             } : {
                 correctAnswer: '',
@@ -87,6 +100,9 @@ export function ExamsTab() {
         };
         if (q.options !== undefined && q.options !== null) obj.options = q.options;
         if (q.correctAnswer !== undefined && q.correctAnswer !== null) obj.correctAnswer = q.correctAnswer;
+        if (q.codingLanguages !== undefined && q.codingLanguages !== null) obj.codingLanguages = q.codingLanguages;
+        if (q.starterCode !== undefined && q.starterCode !== null) obj.starterCode = q.starterCode;
+        if (q.testCases !== undefined && q.testCases !== null) obj.testCases = q.testCases;
         return obj;
     };
 
@@ -120,6 +136,43 @@ export function ExamsTab() {
     // Remove question
     const removeQuestion = (index: number) => {
         setQuestions(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const updateCodingStarterCode = (qIndex: number, language: ProgrammingLanguage, value: string) => {
+        setQuestions(prev => {
+            const updated = [...prev];
+            updated[qIndex].starterCode = {
+                ...(updated[qIndex].starterCode || {}),
+                [language]: value,
+            };
+            return updated;
+        });
+    };
+
+    const addTestCase = (qIndex: number) => {
+        setQuestions(prev => {
+            const updated = [...prev];
+            updated[qIndex].testCases = [...(updated[qIndex].testCases || []), { input: '', expectedOutput: '', isSample: true }];
+            return updated;
+        });
+    };
+
+    const updateTestCase = (qIndex: number, testCaseIndex: number, field: 'input' | 'expectedOutput', value: string) => {
+        setQuestions(prev => {
+            const updated = [...prev];
+            const nextCases = [...(updated[qIndex].testCases || [])];
+            nextCases[testCaseIndex] = { ...nextCases[testCaseIndex], [field]: value };
+            updated[qIndex].testCases = nextCases;
+            return updated;
+        });
+    };
+
+    const removeTestCase = (qIndex: number, testCaseIndex: number) => {
+        setQuestions(prev => {
+            const updated = [...prev];
+            updated[qIndex].testCases = (updated[qIndex].testCases || []).filter((_, index) => index !== testCaseIndex);
+            return updated;
+        });
     };
 
     // Toggle group selection
@@ -167,6 +220,16 @@ export function ExamsTab() {
                 const hasCorrect = q.options?.some(o => o.isCorrect);
                 if (!hasCorrect) {
                     toast({ title: 'No Correct Answer', description: `Question ${i + 1} needs a correct answer.`, variant: 'destructive' });
+                    return;
+                }
+            } else if (q.type === 'coding_5' || q.type === 'coding_10') {
+                if (!q.testCases?.length) {
+                    toast({ title: 'Missing Test Cases', description: `Coding question ${i + 1} needs at least one test case.`, variant: 'destructive' });
+                    return;
+                }
+                const hasInvalidCase = q.testCases.some(test => !test.expectedOutput.trim());
+                if (hasInvalidCase) {
+                    toast({ title: 'Invalid Test Case', description: `Coding question ${i + 1} needs expected output for every test case.`, variant: 'destructive' });
                     return;
                 }
             }
@@ -237,6 +300,8 @@ export function ExamsTab() {
             case 'descriptive_2': return '2 Marks';
             case 'descriptive_5': return '5 Marks';
             case 'descriptive_10': return '10 Marks';
+            case 'coding_5': return 'Coding 5 Marks';
+            case 'coding_10': return 'Coding 10 Marks';
         }
     };
 
@@ -246,19 +311,21 @@ export function ExamsTab() {
             case 'descriptive_2': return 'bg-amber-50 text-amber-600';
             case 'descriptive_5': return 'bg-purple-50 text-purple-600';
             case 'descriptive_10': return 'bg-emerald-50 text-emerald-600';
+            case 'coding_5': return 'bg-sky-50 text-sky-700';
+            case 'coding_10': return 'bg-indigo-50 text-indigo-700';
         }
     };
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="section-header">
                 <div>
-                    <h2 className="text-lg font-semibold text-gray-900">Exams</h2>
-                    <p className="text-sm text-gray-500">{exams.length} exams created</p>
+                    <p className="section-title">Exams</p>
+                    <p className="section-meta">{exams.length} exam{exams.length !== 1 ? 's' : ''} in the system</p>
                 </div>
-                <Button onClick={() => setShowCreator(!showCreator)} className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Button onClick={() => setShowCreator(!showCreator)} className="bg-indigo-600 hover:bg-indigo-500 text-white h-9 rounded-lg text-sm">
                     <PlusCircle className="mr-1.5 h-4 w-4" />
-                    Create Exam
+                    New Exam
                 </Button>
             </div>
 
@@ -418,6 +485,12 @@ export function ExamsTab() {
                                 <Button variant="outline" size="sm" onClick={() => addQuestion('descriptive_10')} className="text-emerald-600 border-emerald-200 hover:bg-emerald-50">
                                     <PlusCircle className="mr-1 h-3.5 w-3.5" /> 10 Marks
                                 </Button>
+                                <Button variant="outline" size="sm" onClick={() => addQuestion('coding_5')} className="text-sky-700 border-sky-200 hover:bg-sky-50">
+                                    <PlusCircle className="mr-1 h-3.5 w-3.5" /> Coding (5)
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => addQuestion('coding_10')} className="text-indigo-700 border-indigo-200 hover:bg-indigo-50">
+                                    <PlusCircle className="mr-1 h-3.5 w-3.5" /> Coding (10)
+                                </Button>
                             </div>
 
                             {/* Questions list */}
@@ -491,6 +564,83 @@ export function ExamsTab() {
                                             )}
 
                                             {q.type !== 'mcq' && (
+                                                q.type === 'coding_5' || q.type === 'coding_10' ? (
+                                                    <div className="space-y-4 pl-2">
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-xs text-gray-500">Supported Languages</Label>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {(q.codingLanguages || codingLanguages).map((language) => (
+                                                                    <span key={language} className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-medium capitalize text-sky-700">
+                                                                        {language}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="grid gap-3 md:grid-cols-3">
+                                                            {codingLanguages.map((language) => (
+                                                                <div key={language} className="space-y-1.5">
+                                                                    <Label className="text-xs text-gray-500 capitalize">{language} Starter Code</Label>
+                                                                    <Textarea
+                                                                        value={q.starterCode?.[language] || ''}
+                                                                        onChange={(e) => updateCodingStarterCode(qIndex, language, e.target.value)}
+                                                                        className="min-h-[180px] resize-y font-mono text-xs"
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                        </div>
+
+                                                        <div className="space-y-2">
+                                                            <div className="flex items-center justify-between">
+                                                                <Label className="text-xs text-gray-500">Test Cases</Label>
+                                                                <Button type="button" variant="outline" size="sm" onClick={() => addTestCase(qIndex)}>
+                                                                    <PlusCircle className="mr-1 h-3.5 w-3.5" />
+                                                                    Add Test Case
+                                                                </Button>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                {(q.testCases || []).map((testCase, testCaseIndex) => (
+                                                                    <div key={testCaseIndex} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                                                                        <div className="mb-2 flex items-center justify-between">
+                                                                            <span className="text-xs font-medium text-gray-500">Test Case {testCaseIndex + 1}</span>
+                                                                            {(q.testCases?.length || 0) > 1 && (
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    onClick={() => removeTestCase(qIndex, testCaseIndex)}
+                                                                                    className="h-7 w-7 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                                                                                >
+                                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                                </Button>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="grid gap-3 md:grid-cols-2">
+                                                                            <div className="space-y-1.5">
+                                                                                <Label className="text-[11px] text-gray-500">Input</Label>
+                                                                                <Textarea
+                                                                                    value={testCase.input}
+                                                                                    onChange={(e) => updateTestCase(qIndex, testCaseIndex, 'input', e.target.value)}
+                                                                                    className="min-h-[90px] resize-y font-mono text-xs"
+                                                                                    placeholder="Optional stdin input"
+                                                                                />
+                                                                            </div>
+                                                                            <div className="space-y-1.5">
+                                                                                <Label className="text-[11px] text-gray-500">Expected Output</Label>
+                                                                                <Textarea
+                                                                                    value={testCase.expectedOutput}
+                                                                                    onChange={(e) => updateTestCase(qIndex, testCaseIndex, 'expectedOutput', e.target.value)}
+                                                                                    className="min-h-[90px] resize-y font-mono text-xs"
+                                                                                    placeholder="Required expected output"
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
                                                 <div className="space-y-1.5 pl-2">
                                                     <Label className="text-xs text-gray-500">Model Answer (for reference)</Label>
                                                     <Textarea
@@ -500,6 +650,7 @@ export function ExamsTab() {
                                                         className="min-h-[40px] resize-none text-sm"
                                                     />
                                                 </div>
+                                                )
                                             )}
                                         </CardContent>
                                     </Card>
@@ -530,11 +681,11 @@ export function ExamsTab() {
                         )}
 
                         <div className="flex gap-2">
-                            <Button onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
+                            <Button onClick={handleSave} disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-500 text-white h-9 rounded-lg text-sm">
                                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                Create Exam
+                                Save Exam
                             </Button>
-                            <Button variant="ghost" onClick={() => setShowCreator(false)}>Cancel</Button>
+                            <Button variant="ghost" onClick={() => setShowCreator(false)} className="h-9 rounded-lg text-sm">Cancel</Button>
                         </div>
                     </CardContent>
                 </Card>

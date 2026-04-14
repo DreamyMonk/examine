@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { RichTextEditor } from '@/components/exam/RichTextEditor';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import {
     saveExamSubmission, createLiveSession, updateLiveSession, endLiveSession,
     subscribeToSession, sendChatMessage, subscribeToChatMessages, deactivateUserSessions
 } from '@/services/examService';
 import { studentJoinAndPublish, studentLeave, getAgoraChannel, publishScreenTrack } from '@/services/agoraService';
-import type { ExamSet, ExamUser, ExamQuestion, StudentAnswer, ProctoringState, ChatMessage } from '@/types/exam';
+import type { ExamSet, ExamUser, ExamQuestion, StudentAnswer, ProctoringState, ChatMessage, ProgrammingLanguage, CodingExecutionResult } from '@/types/exam';
 import { Timestamp } from 'firebase/firestore';
 
 const MAX_VIOLATIONS = 5;
@@ -32,6 +33,14 @@ interface Section {
     dotColor: string;
     questions: { question: ExamQuestion; globalIndex: number }[];
 }
+
+const codingLanguageLabels: Record<ProgrammingLanguage, string> = {
+    javascript: 'JavaScript',
+    python: 'Python',
+    java: 'Java',
+};
+
+const normalizeOutput = (value?: string) => (value || '').replace(/\r\n/g, '\n').trim();
 
 const PauseTimer = ({ endTime }: { endTime: number }) => {
     const [remaining, setRemaining] = useState(0);
@@ -97,6 +106,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
     const [chatInput, setChatInput] = useState('');
     const [showChat, setShowChat] = useState(false);
     const [unreadChat, setUnreadChat] = useState(0);
+    const [runningCodeQuestionId, setRunningCodeQuestionId] = useState<string | null>(null);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     // Toasts for pause/resume state changes
@@ -130,7 +140,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
     // ============ BUILD SECTIONS ============
     const sections: Section[] = useMemo(() => {
         const sectionMap: Record<string, { question: ExamQuestion; globalIndex: number }[]> = {};
-        const sectionOrder = ['mcq', 'descriptive_2', 'descriptive_5', 'descriptive_10'];
+        const sectionOrder = ['mcq', 'descriptive_2', 'descriptive_5', 'descriptive_10', 'coding_5', 'coding_10'];
 
         exam.questions.forEach((q, idx) => {
             if (!sectionMap[q.type]) sectionMap[q.type] = [];
@@ -142,6 +152,8 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
             descriptive_2: { label: '2 Marks', color: 'text-amber-700', bgColor: 'bg-amber-50', borderColor: 'border-amber-200', dotColor: 'bg-amber-400' },
             descriptive_5: { label: '5 Marks', color: 'text-violet-700', bgColor: 'bg-violet-50', borderColor: 'border-violet-200', dotColor: 'bg-violet-400' },
             descriptive_10: { label: '10 Marks', color: 'text-emerald-700', bgColor: 'bg-emerald-50', borderColor: 'border-emerald-200', dotColor: 'bg-emerald-400' },
+            coding_5: { label: 'Coding 5', color: 'text-sky-700', bgColor: 'bg-sky-50', borderColor: 'border-sky-200', dotColor: 'bg-sky-400' },
+            coding_10: { label: 'Coding 10', color: 'text-indigo-700', bgColor: 'bg-indigo-50', borderColor: 'border-indigo-200', dotColor: 'bg-indigo-400' },
         };
 
         return sectionOrder
@@ -670,6 +682,103 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
         });
     };
 
+    const handleCodingAnswer = (question: ExamQuestion, updates: Partial<StudentAnswer>) => {
+        setAnswers(prev => {
+            const newAnswers = new Map(prev);
+            const existing = newAnswers.get(question.id);
+            const defaultLanguage = question.codingLanguages?.[0] || 'javascript';
+            newAnswers.set(question.id, {
+                questionId: question.id,
+                questionType: question.type,
+                marks: question.marks,
+                codeLanguage: existing?.codeLanguage || defaultLanguage,
+                codeAnswer: existing?.codeAnswer || question.starterCode?.[defaultLanguage] || '',
+                ...existing,
+                ...updates,
+            });
+            return newAnswers;
+        });
+    };
+
+    const runCodingQuestion = async (question: ExamQuestion) => {
+        if (!question.testCases?.length) {
+            toast({ title: 'No Test Cases', description: 'This coding question does not have runnable test cases yet.', variant: 'destructive' });
+            return;
+        }
+
+        const existing = answers.get(question.id);
+        const language = existing?.codeLanguage || question.codingLanguages?.[0] || 'javascript';
+        const source = existing?.codeAnswer || question.starterCode?.[language] || '';
+
+        if (!source.trim()) {
+            toast({ title: 'Code Required', description: 'Write some code before running the checker.', variant: 'destructive' });
+            return;
+        }
+
+        setRunningCodeQuestionId(question.id);
+        try {
+            const testResults: NonNullable<CodingExecutionResult['testResults']> = [];
+            let passedCount = 0;
+
+            for (const testCase of question.testCases) {
+                const response = await fetch('/api/code-execute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        language,
+                        source,
+                        stdin: testCase.input || '',
+                    }),
+                });
+
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.error || 'Code execution failed.');
+                }
+
+                const actualOutput = result.run?.stdout ?? result.run?.output ?? '';
+                const stderr = result.run?.stderr || '';
+                const compileOutput = result.compile?.stderr || result.compile?.output || '';
+                const passed = normalizeOutput(actualOutput) === normalizeOutput(testCase.expectedOutput) && !stderr && !compileOutput;
+                if (passed) passedCount += 1;
+
+                testResults.push({
+                    input: testCase.input || '',
+                    expectedOutput: testCase.expectedOutput || '',
+                    actualOutput,
+                    passed,
+                    stderr,
+                    compileOutput,
+                });
+            }
+
+            const execution: CodingExecutionResult = {
+                passedCount,
+                totalCount: question.testCases.length,
+                stdout: testResults[testResults.length - 1]?.actualOutput || '',
+                stderr: testResults.find(result => result.stderr)?.stderr || '',
+                compileOutput: testResults.find(result => result.compileOutput)?.compileOutput || '',
+                testResults,
+            };
+
+            handleCodingAnswer(question, {
+                codeLanguage: language,
+                codeAnswer: source,
+                codeExecution: execution,
+                marksAwarded: passedCount === question.testCases.length ? question.marks : 0,
+            });
+
+            toast({
+                title: passedCount === question.testCases.length ? 'All Tests Passed' : 'Run Complete',
+                description: `${passedCount}/${question.testCases.length} test cases passed.`,
+            });
+        } catch (error: any) {
+            toast({ title: 'Execution Failed', description: error.message || 'Unable to run code right now.', variant: 'destructive' });
+        } finally {
+            setRunningCodeQuestionId(null);
+        }
+    };
+
     const goToQuestion = (globalIndex: number) => {
         setCurrentQuestionIndex(globalIndex);
         const { sectionIndex } = findSectionForGlobalIndex(globalIndex);
@@ -702,7 +811,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
         const answerArray = Array.from(answers.values());
         let totalObtained = 0;
         answerArray.forEach(a => {
-            if (a.questionType === 'mcq' && a.marksAwarded !== undefined) totalObtained += a.marksAwarded;
+            if (a.marksAwarded !== undefined) totalObtained += a.marksAwarded;
         });
 
         try {
@@ -713,37 +822,39 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                 violations: violationCount, status: 'submitted',
             });
             toast({ title: 'Exam Submitted', description: reason || 'Your exam has been submitted successfully.' });
+            setExamState('submitted');
         } catch (error: any) {
+            hasSubmittedRef.current = false;
+            setExamState('in_progress');
             toast({ title: 'Submission Error', description: error.message, variant: 'destructive' });
         }
-        setExamState('submitted');
     }, [answers, exam, user, proctoring, selfieDataUrl, idCardDataUrl, violationCount, toast]);
 
     // ============ FULLSCREEN PROMPT ============
     if (examState === 'fullscreen_prompt') {
         return (
-            <div className="exam-shell min-h-screen flex items-center justify-center px-4">
-                <div className="premium-card glass-panel w-full max-w-md p-8 text-center animate-fade-in">
-                    <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-600 to-cyan-500 shadow-lg shadow-blue-500/25">
-                        <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div className="min-h-screen bg-white flex items-center justify-center px-4">
+                <div className="w-full max-w-sm border border-slate-200 rounded-2xl p-8 text-center animate-fade-in bg-white shadow-sm">
+                    <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-600 shadow-md shadow-indigo-200">
+                        <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9m11.25-5.25v4.5m0-4.5h-4.5m4.5 0L15 9m-11.25 11.25v-4.5m0 4.5h4.5m-4.5 0L9 15m11.25 5.25v-4.5m0 4.5h-4.5m4.5 0L15 15" />
                         </svg>
                     </div>
-                    <h2 className="mb-2 text-2xl font-bold text-slate-950">Enter Fullscreen Mode</h2>
+                    <h2 className="mb-1.5 text-xl font-semibold text-slate-900">Fullscreen Required</h2>
                     <p className="mb-6 text-sm text-slate-500">The exam requires fullscreen mode. Click below or wait for auto-activation.</p>
-                    <div className="relative w-24 h-24 mx-auto mb-6">
-                        <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="45" fill="none" stroke="#f3f4f6" strokeWidth="6" />
-                            <circle cx="50" cy="50" r="45" fill="none" stroke="#2563eb" strokeWidth="6"
+                    <div className="relative w-20 h-20 mx-auto mb-6">
+                        <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="45" fill="none" stroke="#e2e8f0" strokeWidth="7" />
+                            <circle cx="50" cy="50" r="45" fill="none" stroke="#4f46e5" strokeWidth="7"
                                 strokeDasharray={`${2 * Math.PI * 45}`}
                                 strokeDashoffset={`${2 * Math.PI * 45 * (1 - fullscreenCountdown / 15)}`}
                                 strokeLinecap="round" className="transition-all duration-1000" />
                         </svg>
                         <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-2xl font-bold text-gray-900">{fullscreenCountdown}</span>
+                            <span className="text-xl font-bold text-slate-800">{fullscreenCountdown}</span>
                         </div>
                     </div>
-                    <button onClick={handleEnterFullscreen} className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition-colors hover:from-blue-700 hover:to-cyan-600">
+                    <button onClick={handleEnterFullscreen} className="w-full rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 shadow-sm">
                         Enter Fullscreen & Start
                     </button>
                     <p className="mt-3 text-[11px] text-slate-400">Auto-entering in {fullscreenCountdown}s...</p>
@@ -755,28 +866,26 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
     // ============ SUBMITTED ============
     if (examState === 'submitted') {
         return (
-            <div className="exam-shell min-h-screen flex items-center justify-center px-4">
-                <div className="premium-card w-full max-w-lg p-8 text-center animate-fade-in">
-                    <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-50">
-                        <svg className="w-10 h-10 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+                <div className="w-full max-w-md border border-slate-200 rounded-2xl p-8 text-center animate-fade-in bg-white shadow-sm">
+                    <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 border border-emerald-100">
+                        <svg className="w-8 h-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                     </div>
-                    <h2 className="mb-2 text-3xl font-bold text-slate-950">Exam Submitted</h2>
+                    <h2 className="mb-1 text-2xl font-semibold text-slate-900">Exam Submitted</h2>
                     {adminTerminated && (
-                        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-100 text-sm text-red-600">
+                        <div className="mt-3 mb-3 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600 text-left">
                             <strong>Terminated by proctor:</strong> {adminTerminateReason}
                         </div>
                     )}
-                    <p className="mb-8 text-sm text-slate-500">Your answers have been recorded.</p>
-                    <div className="flex gap-6 justify-center mb-8">
-                        <div className="text-center"><p className="text-3xl font-bold text-gray-900">{answeredCount}</p><p className="text-xs text-gray-400 mt-1">Answered</p></div>
-                        <div className="w-px bg-gray-200" />
-                        <div className="text-center"><p className="text-3xl font-bold text-gray-900">{exam.questions.length - answeredCount}</p><p className="text-xs text-gray-400 mt-1">Unanswered</p></div>
-                        <div className="w-px bg-gray-200" />
-                        <div className="text-center"><p className={`text-3xl font-bold ${violationCount > 0 ? 'text-red-500' : 'text-gray-900'}`}>{violationCount}</p><p className="text-xs text-gray-400 mt-1">Violations</p></div>
+                    <p className="mb-6 text-sm text-slate-500">Your responses have been recorded successfully.</p>
+                    <div className="flex gap-0 rounded-xl border border-slate-200 overflow-hidden mb-6">
+                        <div className="flex-1 py-4 text-center border-r border-slate-200"><p className="text-2xl font-bold text-slate-900">{answeredCount}</p><p className="text-xs text-slate-400 mt-0.5">Answered</p></div>
+                        <div className="flex-1 py-4 text-center border-r border-slate-200"><p className="text-2xl font-bold text-slate-900">{exam.questions.length - answeredCount}</p><p className="text-xs text-slate-400 mt-0.5">Skipped</p></div>
+                        <div className="flex-1 py-4 text-center"><p className={`text-2xl font-bold ${violationCount > 0 ? 'text-red-500' : 'text-slate-900'}`}>{violationCount}</p><p className="text-xs text-slate-400 mt-0.5">Violations</p></div>
                     </div>
-                    <button onClick={() => window.close()} className="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800">
+                    <button onClick={() => window.close()} className="w-full rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700">
                         Close Window
                     </button>
                 </div>
@@ -786,10 +895,11 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
 
     if (examState === 'submitting') {
         return (
-            <div className="exam-shell min-h-screen flex items-center justify-center px-4">
-                <div className="premium-card w-full max-w-md p-8 text-center">
-                    <div className="w-12 h-12 border-3 border-gray-200 border-t-gray-900 rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-sm text-slate-500">Submitting your exam...</p>
+            <div className="min-h-screen bg-white flex items-center justify-center px-4">
+                <div className="w-full max-w-sm p-8 text-center">
+                    <div className="w-10 h-10 border-2 border-slate-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-sm font-medium text-slate-600">Submitting your exam...</p>
+                    <p className="text-xs text-slate-400 mt-1">Please do not close this window.</p>
                 </div>
             </div>
         );
@@ -800,7 +910,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
     const sectionInfo = sections[currentSection.sectionIndex];
 
     return (
-        <div className="exam-shell h-screen flex flex-col overflow-hidden select-none">
+        <div className="h-screen flex flex-col overflow-hidden select-none bg-slate-50">
             {/* ====== ADMIN PAUSED OVERLAY ====== */}
             {adminPaused && (
                 <div className="fixed inset-0 z-[250] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}>
@@ -975,10 +1085,10 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
             )}
 
             {/* ====== TOP BAR ====== */}
-            <header className="glass-panel flex h-16 flex-shrink-0 items-center border-b border-white/70 px-5 py-0">
+            <header className="flex h-14 flex-shrink-0 items-center border-b border-slate-200 bg-white px-5 py-0 shadow-sm">
                 <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-950 to-slate-700 shadow-lg shadow-slate-900/15">
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-600 shadow-sm shadow-indigo-200">
                             <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
@@ -990,7 +1100,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                     </div>
                     <div className="flex items-center gap-2">
                         {/* Timer */}
-                        <div className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-mono font-bold transition-all ${isTimeCritical ? 'bg-red-500 text-white animate-pulse' : isTimeLow ? 'border border-red-200 bg-red-50 text-red-600' : 'bg-slate-100 text-slate-800'}`}>
+                        <div className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-mono font-semibold transition-all ${isTimeCritical ? 'bg-red-500 text-white animate-pulse' : isTimeLow ? 'border border-red-200 bg-red-50 text-red-600' : 'border border-slate-200 bg-slate-50 text-slate-700'}`}>
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
                             {formatTime(timeLeft)}
                             {adminPaused && <span className="text-[9px] ml-1 bg-amber-100 text-amber-700 px-1 rounded">PAUSED</span>}
@@ -1036,8 +1146,8 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
             {/* ====== MAIN CONTENT ====== */}
             <div className="flex-1 flex overflow-hidden">
                 {/* LEFT SIDEBAR */}
-                <aside className="glass-panel flex w-[240px] flex-shrink-0 flex-col overflow-hidden border-r border-white/70">
-                    <div className="border-b border-slate-200/80 px-4 py-4">
+                <aside className="flex w-[220px] flex-shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white">
+                    <div className="border-b border-slate-100 px-4 py-3">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Questions</span>
                             <span className="text-xs text-gray-400">{answeredCount}/{exam.questions.length} done</span>
@@ -1047,7 +1157,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto py-3">
+                    <div className="flex-1 overflow-y-auto py-2">
                         {sections.map((section, sIdx) => {
                             const answeredInSection = section.questions.filter(q => answers.has(q.question.id)).length;
                             const isActiveSection = sIdx === currentSection.sectionIndex;
@@ -1055,11 +1165,11 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                                 <div key={section.type} className="mb-1">
                                     <button
                                         onClick={() => { setActiveSectionIndex(sIdx); goToQuestion(section.questions[0].globalIndex); }}
-                                        className={`flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-white/70 ${isActiveSection ? 'bg-white/80' : ''}`}
+                                        className={`flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors hover:bg-slate-50 ${isActiveSection ? 'bg-indigo-50' : ''}`}
                                     >
                                         <div className="flex items-center gap-2.5">
                                             <div className={`w-2 h-2 rounded-full ${section.dotColor}`} />
-                                            <span className={`text-xs font-bold uppercase tracking-wide ${isActiveSection ? 'text-gray-900' : 'text-gray-500'}`}>{section.label}</span>
+                                            <span className={`text-xs font-semibold uppercase tracking-wide ${isActiveSection ? 'text-indigo-700' : 'text-slate-500'}`}>{section.label}</span>
                                         </div>
                                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${section.bgColor} ${section.color}`}>{answeredInSection}/{section.questions.length}</span>
                                     </button>
@@ -1070,7 +1180,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                                                 const isCurrent = q.globalIndex === currentQuestionIndex;
                                                 return (
                                                     <button key={q.question.id} onClick={() => goToQuestion(q.globalIndex)}
-                                                        className={`h-9 w-full rounded-xl text-[11px] font-semibold transition-all duration-150 ${isCurrent ? 'scale-105 bg-slate-950 text-white shadow-sm' : hasAnswer ? 'border border-emerald-200 bg-emerald-100 text-emerald-700' : 'border border-slate-200 bg-white/80 text-slate-400 hover:bg-slate-100'}`}>
+                                                        className={`h-9 w-full rounded-lg text-[11px] font-semibold transition-all duration-150 ${isCurrent ? 'bg-indigo-600 text-white shadow-sm' : hasAnswer ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'border border-slate-200 bg-white text-slate-400 hover:bg-slate-50'}`}>
                                                         {localIdx + 1}
                                                     </button>
                                                 );
@@ -1082,10 +1192,10 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                         })}
                     </div>
 
-                    <div className="flex flex-shrink-0 items-center gap-4 border-t border-slate-200/80 px-4 py-3 text-[10px] text-slate-400">
-                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-gray-900" />Current</div>
-                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-emerald-100 border border-emerald-200" />Answered</div>
-                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-gray-50 border border-gray-100" />Pending</div>
+                    <div className="flex flex-shrink-0 items-center gap-3 border-t border-slate-100 px-4 py-3 text-[10px] text-slate-400">
+                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-indigo-600" />Active</div>
+                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-emerald-100 border border-emerald-200" />Done</div>
+                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-white border border-slate-200" />Empty</div>
                     </div>
                 </aside>
 
@@ -1093,7 +1203,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                 <main className="flex-1 flex flex-col overflow-hidden">
                     {currentQuestion && (
                         <>
-                            <div className="glass-panel flex flex-shrink-0 items-center justify-between border-b border-white/70 px-8 py-4">
+                            <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-100 bg-white px-8 py-3">
                                 <div className="flex items-center gap-2">
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${sectionInfo?.bgColor || 'bg-gray-100'} ${sectionInfo?.color || 'text-gray-600'}`}>{sectionInfo?.label || ''}</span>
                                     <svg className="w-3 h-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
@@ -1102,11 +1212,11 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                                 <span className="text-xs text-gray-400">{currentQuestion.marks} mark{currentQuestion.marks > 1 ? 's' : ''}</span>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto">
-                                <div className="px-8 py-8">
-                                    <div className="premium-card mb-6 border-slate-200/70 p-6">
-                                        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Prompt</p>
-                                        <h2 className="text-xl font-medium leading-relaxed text-slate-950">{currentQuestion.question}</h2>
+                            <div className="flex-1 overflow-y-auto bg-slate-50">
+                                <div className="px-8 py-7">
+                                    <div className="mb-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                                        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Question</p>
+                                        <h2 className="text-lg font-medium leading-relaxed text-slate-900">{currentQuestion.question}</h2>
                                     </div>
 
                                     {currentQuestion.type === 'mcq' && currentQuestion.options && (
@@ -1115,20 +1225,117 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                                                 const isSelected = currentAnswer?.selectedOptionIndex === index;
                                                 return (
                                                     <button key={index} onClick={() => handleMcqAnswer(currentQuestion.id, index, currentQuestion)}
-                                                        className={`flex w-full items-center gap-4 rounded-2xl border-2 p-5 text-left transition-all duration-150 ${isSelected ? 'border-slate-950 bg-white shadow-lg shadow-slate-900/5' : 'border-slate-200 bg-white/80 hover:border-slate-300 hover:bg-white'}`}>
-                                                        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-sm font-bold transition-colors ${isSelected ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                                        className={`flex w-full items-center gap-4 rounded-xl border-2 p-4 text-left transition-all duration-150 ${isSelected ? 'border-indigo-600 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50'}`}>
+                                                        <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-sm font-bold transition-colors ${isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
                                                             {isSelected ? (
                                                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                                                             ) : String.fromCharCode(65 + index)}
                                                         </div>
-                                                        <span className={`text-sm flex-1 ${isSelected ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>{option.text}</span>
+                                                        <span className={`text-sm flex-1 ${isSelected ? 'text-indigo-900 font-medium' : 'text-slate-700'}`}>{option.text}</span>
                                                     </button>
                                                 );
                                             })}
                                         </div>
                                     )}
 
-                                    {currentQuestion.type !== 'mcq' && (
+                                    {(currentQuestion.type === 'coding_5' || currentQuestion.type === 'coding_10') && (
+                                        <div className="space-y-5">
+                                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                                <div>
+                                                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Language</label>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {(currentQuestion.codingLanguages || ['javascript', 'python', 'java']).map((language) => {
+                                                            const typedLanguage = language as ProgrammingLanguage;
+                                                            const isActive = (currentAnswer?.codeLanguage || currentQuestion.codingLanguages?.[0] || 'javascript') === typedLanguage;
+                                                            return (
+                                                                <button
+                                                                    key={typedLanguage}
+                                                                    type="button"
+                                                                    onClick={() => handleCodingAnswer(currentQuestion, {
+                                                                        codeLanguage: typedLanguage,
+                                                                        codeAnswer: answers.get(currentQuestion.id)?.codeLanguage === typedLanguage
+                                                                            ? answers.get(currentQuestion.id)?.codeAnswer
+                                                                            : currentQuestion.starterCode?.[typedLanguage] || '',
+                                                                    })}
+                                                                    className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${isActive
+                                                                        ? 'border-slate-950 bg-slate-950 text-white'
+                                                                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                                                        }`}
+                                                                >
+                                                                    {codingLanguageLabels[typedLanguage]}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    onClick={() => runCodingQuestion(currentQuestion)}
+                                                    disabled={runningCodeQuestionId === currentQuestion.id}
+                                                    className="rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+                                                >
+                                                    {runningCodeQuestionId === currentQuestion.id ? 'Running...' : 'Run Code'}
+                                                </Button>
+                                            </div>
+
+                                            <div>
+                                                <label className="mb-3 block text-xs font-semibold uppercase tracking-wide text-slate-500">Code Editor</label>
+                                                <Textarea
+                                                    value={currentAnswer?.codeAnswer || currentQuestion.starterCode?.[(currentAnswer?.codeLanguage || currentQuestion.codingLanguages?.[0] || 'javascript') as ProgrammingLanguage] || ''}
+                                                    onChange={(e) => handleCodingAnswer(currentQuestion, {
+                                                        codeLanguage: currentAnswer?.codeLanguage || currentQuestion.codingLanguages?.[0] || 'javascript',
+                                                        codeAnswer: e.target.value,
+                                                    })}
+                                                    className="min-h-[420px] resize-y rounded-2xl border border-slate-200 bg-slate-950 p-4 font-mono text-sm text-slate-100"
+                                                    placeholder="Write your solution here..."
+                                                />
+                                            </div>
+
+                                            {currentQuestion.testCases && currentQuestion.testCases.length > 0 && (
+                                                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                                    <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Output Checker</p>
+                                                    <div className="space-y-3">
+                                                        {currentQuestion.testCases.map((testCase, testIndex) => {
+                                                            const result = currentAnswer?.codeExecution?.testResults?.[testIndex];
+                                                            return (
+                                                                <div key={testIndex} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                                                    <div className="mb-2 flex items-center justify-between">
+                                                                        <p className="text-sm font-medium text-slate-700">Test Case {testIndex + 1}</p>
+                                                                        {result && (
+                                                                            <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${result.passed ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                                                                                {result.passed ? 'Passed' : 'Failed'}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="grid gap-3 md:grid-cols-3">
+                                                                        <div>
+                                                                            <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">Input</p>
+                                                                            <pre className="rounded-lg bg-slate-950/95 p-3 text-xs text-slate-100 whitespace-pre-wrap">{testCase.input || '(empty)'}</pre>
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">Expected</p>
+                                                                            <pre className="rounded-lg bg-slate-950/95 p-3 text-xs text-slate-100 whitespace-pre-wrap">{testCase.expectedOutput || '(empty)'}</pre>
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">Actual</p>
+                                                                            <pre className="rounded-lg bg-slate-950/95 p-3 text-xs text-slate-100 whitespace-pre-wrap">{result?.actualOutput || result?.stderr || result?.compileOutput || 'Run code to see output'}</pre>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    {currentAnswer?.codeExecution && (
+                                                        <p className="mt-3 text-sm text-slate-600">
+                                                            Passed {currentAnswer.codeExecution.passedCount || 0} of {currentAnswer.codeExecution.totalCount || currentQuestion.testCases.length} test cases.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {currentQuestion.type !== 'mcq' && currentQuestion.type !== 'coding_5' && currentQuestion.type !== 'coding_10' && (
                                         <div>
                                             <label className="mb-3 block text-xs font-semibold uppercase tracking-wide text-slate-500">Your Answer</label>
                                             <RichTextEditor
@@ -1142,21 +1349,21 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                                 </div>
                             </div>
 
-                            <div className="glass-panel flex flex-shrink-0 items-center justify-between border-t border-white/70 px-8 py-4">
+                            <div className="flex flex-shrink-0 items-center justify-between border-t border-slate-200 bg-white px-8 py-3">
                                 <button onClick={goPrev} disabled={currentQuestionIndex === 0}
-                                    className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30">
+                                    className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-30 bg-white">
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
                                     Previous
                                 </button>
                                 <span className="text-xs text-gray-400">{currentQuestionIndex + 1} of {exam.questions.length}</span>
                                 {currentQuestionIndex === exam.questions.length - 1 ? (
-                                    <button onClick={() => { if (confirm(`Submit? ${answeredCount}/${exam.questions.length} answered.`)) handleSubmit(); }}
-                                        className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700">
+                                    <button onClick={() => { if (confirm(`Submit? ${answeredCount}/${exam.questions.length} answered.`)) handleSubmit('Ended by student'); }}
+                                        className="flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 shadow-sm">
                                         Submit Exam
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                                     </button>
                                 ) : (
-                                    <button onClick={goNext} className="flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800">
+                                    <button onClick={goNext} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 shadow-sm">
                                         Next <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                                     </button>
                                 )}
@@ -1166,8 +1373,8 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                 </main>
 
                 {/* ====== RIGHT SIDE - Camera Panel ====== */}
-                <aside className="glass-panel flex w-[240px] flex-shrink-0 flex-col border-l border-white/70">
-                    <div className="border-b border-slate-200/80 px-4 py-4">
+                <aside className="flex w-[200px] flex-shrink-0 flex-col border-l border-slate-200 bg-white">
+                    <div className="border-b border-slate-100 px-4 py-3">
                         <div className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full ${proctoring.cameraStream ? 'bg-emerald-500' : 'bg-red-500'} animate-pulse`} />
                             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -1175,8 +1382,8 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                             </span>
                         </div>
                     </div>
-                    <div className="flex-1 p-3">
-                        <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-black shadow-xl shadow-slate-900/15">
+                    <div className="flex-1 p-3 bg-slate-50">
+                        <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-slate-900 shadow-sm border border-slate-200">
                             {proctoring.cameraStream ? (
                                 <>
                                     <video
@@ -1204,7 +1411,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                         </div>
                     </div>
 
-                    <div className="flex-shrink-0 space-y-3 border-t border-slate-200/80 px-4 py-4">
+                    <div className="hidden flex-shrink-0 space-y-3 border-t border-slate-200/80 px-4 py-4">
                         <div className="flex items-center justify-between text-[11px]">
                             <span className="text-gray-400">Violations</span>
                             <span className={`font-bold ${violationCount > 0 ? 'text-red-500' : 'text-gray-700'}`}>{violationCount}/{MAX_VIOLATIONS}</span>

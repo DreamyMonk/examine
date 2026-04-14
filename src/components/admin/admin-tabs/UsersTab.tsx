@@ -81,14 +81,14 @@ export function UsersTab() {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="section-header">
                 <div>
-                    <h2 className="text-lg font-semibold text-gray-900">Users</h2>
-                    <p className="text-sm text-gray-500">{users.length} registered users</p>
+                    <p className="section-title">Candidates</p>
+                    <p className="section-meta">{users.length} registered candidate{users.length !== 1 ? 's' : ''}</p>
                 </div>
-                <Button onClick={() => setShowForm(!showForm)} className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Button onClick={() => setShowForm(!showForm)} className="bg-indigo-600 hover:bg-indigo-500 text-white h-9 rounded-lg text-sm">
                     <UserPlus className="mr-1.5 h-4 w-4" />
-                    Add User
+                    Add Candidate
                 </Button>
             </div>
 
@@ -122,11 +122,11 @@ export function UsersTab() {
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <Button onClick={handleAdd} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
+                            <Button onClick={handleAdd} disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-500 text-white h-9 rounded-lg text-sm">
                                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                Save User
+                                Save Candidate
                             </Button>
-                            <Button variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
+                            <Button variant="ghost" onClick={() => setShowForm(false)} className="h-9 rounded-lg text-sm">Cancel</Button>
                         </div>
                     </CardContent>
                 </Card>

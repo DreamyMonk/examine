@@ -361,7 +361,36 @@ export function SubmissionsTab() {
                                                             </div>
                                                         )}
 
-                                                        {answer.questionType !== 'mcq' && (
+                                                        {(answer.questionType === 'coding_5' || answer.questionType === 'coding_10') && (
+                                                            <div className="mt-2 space-y-2">
+                                                                <div className="rounded border border-gray-100 bg-white p-2 text-sm text-gray-600">
+                                                                    <p className="mb-1 text-xs text-gray-400">Language</p>
+                                                                    <p className="font-medium capitalize text-gray-700">{answer.codeLanguage || 'Not selected'}</p>
+                                                                </div>
+                                                                <div className="rounded border border-gray-100 bg-slate-950 p-3 text-xs text-slate-100">
+                                                                    <p className="mb-2 text-[11px] uppercase tracking-wide text-slate-400">Submitted Code</p>
+                                                                    <pre className="whitespace-pre-wrap">{answer.codeAnswer || 'No code submitted'}</pre>
+                                                                </div>
+                                                                {answer.codeExecution?.testResults?.length ? (
+                                                                    <div className="space-y-2">
+                                                                        {answer.codeExecution.testResults.map((result, resultIndex) => (
+                                                                            <div key={resultIndex} className="rounded border border-gray-100 bg-white p-2">
+                                                                                <div className="mb-1 flex items-center justify-between">
+                                                                                    <p className="text-xs font-medium text-gray-500">Test Case {resultIndex + 1}</p>
+                                                                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${result.passed ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                                                                                        {result.passed ? 'Passed' : 'Failed'}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <p className="text-[11px] text-gray-500">Expected: <span className="font-medium text-gray-700">{result.expectedOutput || '(empty)'}</span></p>
+                                                                                <p className="text-[11px] text-gray-500">Actual: <span className="font-medium text-gray-700">{result.actualOutput || result.stderr || result.compileOutput || '(empty)'}</span></p>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : null}
+                                                            </div>
+                                                        )}
+
+                                                        {answer.questionType !== 'mcq' && answer.questionType !== 'coding_5' && answer.questionType !== 'coding_10' && (
                                                             <div className="mt-2 rounded border border-gray-100 bg-white p-2 text-sm text-gray-600">
                                                                 <p className="mb-1 text-xs text-gray-400">Student&apos;s Answer:</p>
                                                                 {answer.descriptiveAnswer ? (
