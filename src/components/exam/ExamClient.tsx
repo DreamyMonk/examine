@@ -722,15 +722,15 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
     // ============ FULLSCREEN PROMPT ============
     if (examState === 'fullscreen_prompt') {
         return (
-            <div className="min-h-screen bg-white flex items-center justify-center px-4">
-                <div className="w-full max-w-sm text-center animate-fade-in">
-                    <div className="w-20 h-20 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-6">
-                        <svg className="w-10 h-10 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div className="exam-shell min-h-screen flex items-center justify-center px-4">
+                <div className="premium-card glass-panel w-full max-w-md p-8 text-center animate-fade-in">
+                    <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-600 to-cyan-500 shadow-lg shadow-blue-500/25">
+                        <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9m11.25-5.25v4.5m0-4.5h-4.5m4.5 0L15 9m-11.25 11.25v-4.5m0 4.5h4.5m-4.5 0L9 15m11.25 5.25v-4.5m0 4.5h-4.5m4.5 0L15 15" />
                         </svg>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">Enter Fullscreen Mode</h2>
-                    <p className="text-gray-500 text-sm mb-6">The exam requires fullscreen mode. Click below or wait for auto-activation.</p>
+                    <h2 className="mb-2 text-2xl font-bold text-slate-950">Enter Fullscreen Mode</h2>
+                    <p className="mb-6 text-sm text-slate-500">The exam requires fullscreen mode. Click below or wait for auto-activation.</p>
                     <div className="relative w-24 h-24 mx-auto mb-6">
                         <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
                             <circle cx="50" cy="50" r="45" fill="none" stroke="#f3f4f6" strokeWidth="6" />
@@ -743,10 +743,10 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                             <span className="text-2xl font-bold text-gray-900">{fullscreenCountdown}</span>
                         </div>
                     </div>
-                    <button onClick={handleEnterFullscreen} className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">
+                    <button onClick={handleEnterFullscreen} className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition-colors hover:from-blue-700 hover:to-cyan-600">
                         Enter Fullscreen & Start
                     </button>
-                    <p className="text-[11px] text-gray-400 mt-3">Auto-entering in {fullscreenCountdown}s...</p>
+                    <p className="mt-3 text-[11px] text-slate-400">Auto-entering in {fullscreenCountdown}s...</p>
                 </div>
             </div>
         );
@@ -755,20 +755,20 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
     // ============ SUBMITTED ============
     if (examState === 'submitted') {
         return (
-            <div className="min-h-screen bg-white flex items-center justify-center px-4">
-                <div className="w-full max-w-md text-center animate-fade-in">
-                    <div className="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-6">
+            <div className="exam-shell min-h-screen flex items-center justify-center px-4">
+                <div className="premium-card w-full max-w-lg p-8 text-center animate-fade-in">
+                    <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-50">
                         <svg className="w-10 h-10 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Exam Submitted</h2>
+                    <h2 className="mb-2 text-3xl font-bold text-slate-950">Exam Submitted</h2>
                     {adminTerminated && (
                         <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-100 text-sm text-red-600">
                             <strong>Terminated by proctor:</strong> {adminTerminateReason}
                         </div>
                     )}
-                    <p className="text-gray-500 text-sm mb-8">Your answers have been recorded.</p>
+                    <p className="mb-8 text-sm text-slate-500">Your answers have been recorded.</p>
                     <div className="flex gap-6 justify-center mb-8">
                         <div className="text-center"><p className="text-3xl font-bold text-gray-900">{answeredCount}</p><p className="text-xs text-gray-400 mt-1">Answered</p></div>
                         <div className="w-px bg-gray-200" />
@@ -776,7 +776,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                         <div className="w-px bg-gray-200" />
                         <div className="text-center"><p className={`text-3xl font-bold ${violationCount > 0 ? 'text-red-500' : 'text-gray-900'}`}>{violationCount}</p><p className="text-xs text-gray-400 mt-1">Violations</p></div>
                     </div>
-                    <button onClick={() => window.close()} className="px-6 py-3 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">
+                    <button onClick={() => window.close()} className="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800">
                         Close Window
                     </button>
                 </div>
@@ -786,10 +786,10 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
 
     if (examState === 'submitting') {
         return (
-            <div className="min-h-screen bg-white flex items-center justify-center">
-                <div className="text-center">
+            <div className="exam-shell min-h-screen flex items-center justify-center px-4">
+                <div className="premium-card w-full max-w-md p-8 text-center">
                     <div className="w-12 h-12 border-3 border-gray-200 border-t-gray-900 rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-gray-500 text-sm">Submitting your exam...</p>
+                    <p className="text-sm text-slate-500">Submitting your exam...</p>
                 </div>
             </div>
         );
@@ -800,7 +800,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
     const sectionInfo = sections[currentSection.sectionIndex];
 
     return (
-        <div className="h-screen bg-[#fafafa] flex flex-col overflow-hidden select-none">
+        <div className="exam-shell h-screen flex flex-col overflow-hidden select-none">
             {/* ====== ADMIN PAUSED OVERLAY ====== */}
             {adminPaused && (
                 <div className="fixed inset-0 z-[250] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}>
@@ -923,8 +923,8 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
 
             {/* ====== CHAT PANEL (floating) ====== */}
             {showChat && (
-                <div className="fixed bottom-4 right-4 z-[300] w-80 bg-white rounded-xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden" style={{ height: '400px' }}>
-                    <div className="px-4 py-3 bg-blue-600 text-white flex items-center justify-between flex-shrink-0">
+                <div className="fixed bottom-4 right-4 z-[300] flex w-80 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" style={{ height: '400px' }}>
+                    <div className="flex flex-shrink-0 items-center justify-between bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 text-white">
                         <div className="flex items-center gap-2">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -937,7 +937,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                             </svg>
                         </button>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50">
+                    <div className="flex-1 space-y-2 overflow-y-auto bg-slate-50/80 p-3">
                         {chatMessages.length === 0 && (
                             <p className="text-xs text-gray-400 text-center mt-8">No messages yet</p>
                         )}
@@ -963,9 +963,9 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                             onChange={e => setChatInput(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleSendChat()}
                             placeholder="Type a message..."
-                            className="flex-1 text-sm px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-blue-300"
+                            className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-300 focus:outline-none"
                         />
-                        <button onClick={handleSendChat} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors">
+                        <button onClick={handleSendChat} className="rounded-xl bg-blue-600 px-3 py-2 text-sm text-white transition-colors hover:bg-blue-700">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                             </svg>
@@ -975,10 +975,10 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
             )}
 
             {/* ====== TOP BAR ====== */}
-            <header className="bg-white border-b border-gray-200 px-5 py-0 flex-shrink-0 h-14 flex items-center">
+            <header className="glass-panel flex h-16 flex-shrink-0 items-center border-b border-white/70 px-5 py-0">
                 <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-950 to-slate-700 shadow-lg shadow-slate-900/15">
                             <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
@@ -990,14 +990,14 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                     </div>
                     <div className="flex items-center gap-2">
                         {/* Timer */}
-                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-mono font-bold transition-all ${isTimeCritical ? 'bg-red-500 text-white animate-pulse' : isTimeLow ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-gray-100 text-gray-800'}`}>
+                        <div className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-mono font-bold transition-all ${isTimeCritical ? 'bg-red-500 text-white animate-pulse' : isTimeLow ? 'border border-red-200 bg-red-50 text-red-600' : 'bg-slate-100 text-slate-800'}`}>
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
                             {formatTime(timeLeft)}
                             {adminPaused && <span className="text-[9px] ml-1 bg-amber-100 text-amber-700 px-1 rounded">PAUSED</span>}
                         </div>
                         {/* Violations */}
                         {violationCount > 0 && (
-                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold bg-red-50 text-red-600 border border-red-200">
+                            <div className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600">
                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
                                 </svg>
@@ -1007,7 +1007,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                         {/* Chat toggle */}
                         <button
                             onClick={() => { setShowChat(!showChat); setUnreadChat(0); }}
-                            className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-blue-600 hover:bg-blue-50 transition-colors"
+                            className="relative flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50"
                         >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -1022,7 +1022,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                             onClick={() => {
                                 if (confirm(`Submit? ${answeredCount}/${exam.questions.length} answered.`)) handleSubmit('Ended by student');
                             }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                            className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
                         >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1036,8 +1036,8 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
             {/* ====== MAIN CONTENT ====== */}
             <div className="flex-1 flex overflow-hidden">
                 {/* LEFT SIDEBAR */}
-                <aside className="w-[220px] bg-white border-r border-gray-200 flex flex-col flex-shrink-0 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-gray-100">
+                <aside className="glass-panel flex w-[240px] flex-shrink-0 flex-col overflow-hidden border-r border-white/70">
+                    <div className="border-b border-slate-200/80 px-4 py-4">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Questions</span>
                             <span className="text-xs text-gray-400">{answeredCount}/{exam.questions.length} done</span>
@@ -1047,7 +1047,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto py-2">
+                    <div className="flex-1 overflow-y-auto py-3">
                         {sections.map((section, sIdx) => {
                             const answeredInSection = section.questions.filter(q => answers.has(q.question.id)).length;
                             const isActiveSection = sIdx === currentSection.sectionIndex;
@@ -1055,7 +1055,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                                 <div key={section.type} className="mb-1">
                                     <button
                                         onClick={() => { setActiveSectionIndex(sIdx); goToQuestion(section.questions[0].globalIndex); }}
-                                        className={`w-full px-4 py-2.5 flex items-center justify-between text-left transition-colors hover:bg-gray-50 ${isActiveSection ? 'bg-gray-50' : ''}`}
+                                        className={`flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-white/70 ${isActiveSection ? 'bg-white/80' : ''}`}
                                     >
                                         <div className="flex items-center gap-2.5">
                                             <div className={`w-2 h-2 rounded-full ${section.dotColor}`} />
@@ -1070,7 +1070,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                                                 const isCurrent = q.globalIndex === currentQuestionIndex;
                                                 return (
                                                     <button key={q.question.id} onClick={() => goToQuestion(q.globalIndex)}
-                                                        className={`h-8 w-full rounded text-[11px] font-semibold transition-all duration-150 ${isCurrent ? 'bg-gray-900 text-white shadow-sm scale-105' : hasAnswer ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-gray-50 text-gray-400 border border-gray-100 hover:bg-gray-100'}`}>
+                                                        className={`h-9 w-full rounded-xl text-[11px] font-semibold transition-all duration-150 ${isCurrent ? 'scale-105 bg-slate-950 text-white shadow-sm' : hasAnswer ? 'border border-emerald-200 bg-emerald-100 text-emerald-700' : 'border border-slate-200 bg-white/80 text-slate-400 hover:bg-slate-100'}`}>
                                                         {localIdx + 1}
                                                     </button>
                                                 );
@@ -1082,7 +1082,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                         })}
                     </div>
 
-                    <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-4 text-[10px] text-gray-400 flex-shrink-0">
+                    <div className="flex flex-shrink-0 items-center gap-4 border-t border-slate-200/80 px-4 py-3 text-[10px] text-slate-400">
                         <div className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-gray-900" />Current</div>
                         <div className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-emerald-100 border border-emerald-200" />Answered</div>
                         <div className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-gray-50 border border-gray-100" />Pending</div>
@@ -1093,7 +1093,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                 <main className="flex-1 flex flex-col overflow-hidden">
                     {currentQuestion && (
                         <>
-                            <div className="px-8 py-3 border-b border-gray-100 bg-white flex items-center justify-between flex-shrink-0">
+                            <div className="glass-panel flex flex-shrink-0 items-center justify-between border-b border-white/70 px-8 py-4">
                                 <div className="flex items-center gap-2">
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${sectionInfo?.bgColor || 'bg-gray-100'} ${sectionInfo?.color || 'text-gray-600'}`}>{sectionInfo?.label || ''}</span>
                                     <svg className="w-3 h-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
@@ -1103,9 +1103,10 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                             </div>
 
                             <div className="flex-1 overflow-y-auto">
-                                <div className="px-8 py-6">
-                                    <div className="mb-5">
-                                        <h2 className="text-lg font-medium text-gray-900 leading-relaxed">{currentQuestion.question}</h2>
+                                <div className="px-8 py-8">
+                                    <div className="premium-card mb-6 border-slate-200/70 p-6">
+                                        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Prompt</p>
+                                        <h2 className="text-xl font-medium leading-relaxed text-slate-950">{currentQuestion.question}</h2>
                                     </div>
 
                                     {currentQuestion.type === 'mcq' && currentQuestion.options && (
@@ -1114,8 +1115,8 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                                                 const isSelected = currentAnswer?.selectedOptionIndex === index;
                                                 return (
                                                     <button key={index} onClick={() => handleMcqAnswer(currentQuestion.id, index, currentQuestion)}
-                                                        className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all duration-150 ${isSelected ? 'border-gray-900 bg-gray-50' : 'border-gray-100 hover:border-gray-300 hover:bg-gray-50/50'}`}>
-                                                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${isSelected ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                                        className={`flex w-full items-center gap-4 rounded-2xl border-2 p-5 text-left transition-all duration-150 ${isSelected ? 'border-slate-950 bg-white shadow-lg shadow-slate-900/5' : 'border-slate-200 bg-white/80 hover:border-slate-300 hover:bg-white'}`}>
+                                                        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-sm font-bold transition-colors ${isSelected ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-500'}`}>
                                                             {isSelected ? (
                                                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                                                             ) : String.fromCharCode(65 + index)}
@@ -1129,7 +1130,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
 
                                     {currentQuestion.type !== 'mcq' && (
                                         <div>
-                                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 block">Your Answer</label>
+                                            <label className="mb-3 block text-xs font-semibold uppercase tracking-wide text-slate-500">Your Answer</label>
                                             <RichTextEditor
                                                 value={currentAnswer?.descriptiveAnswer || ''}
                                                 onChange={(val) => handleDescriptiveAnswer(currentQuestion.id, val, currentQuestion)}
@@ -1141,21 +1142,21 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                                 </div>
                             </div>
 
-                            <div className="px-8 py-4 border-t border-gray-200 bg-white flex items-center justify-between flex-shrink-0">
+                            <div className="glass-panel flex flex-shrink-0 items-center justify-between border-t border-white/70 px-8 py-4">
                                 <button onClick={goPrev} disabled={currentQuestionIndex === 0}
-                                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                                    className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30">
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
                                     Previous
                                 </button>
                                 <span className="text-xs text-gray-400">{currentQuestionIndex + 1} of {exam.questions.length}</span>
                                 {currentQuestionIndex === exam.questions.length - 1 ? (
                                     <button onClick={() => { if (confirm(`Submit? ${answeredCount}/${exam.questions.length} answered.`)) handleSubmit(); }}
-                                        className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
+                                        className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700">
                                         Submit Exam
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                                     </button>
                                 ) : (
-                                    <button onClick={goNext} className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-gray-900 text-white hover:bg-gray-800 transition-colors">
+                                    <button onClick={goNext} className="flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800">
                                         Next <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                                     </button>
                                 )}
@@ -1165,8 +1166,8 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                 </main>
 
                 {/* ====== RIGHT SIDE - Camera Panel ====== */}
-                <aside className="w-[220px] bg-white border-l border-gray-200 flex flex-col flex-shrink-0">
-                    <div className="px-3 py-2.5 border-b border-gray-100">
+                <aside className="glass-panel flex w-[240px] flex-shrink-0 flex-col border-l border-white/70">
+                    <div className="border-b border-slate-200/80 px-4 py-4">
                         <div className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full ${proctoring.cameraStream ? 'bg-emerald-500' : 'bg-red-500'} animate-pulse`} />
                             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -1174,8 +1175,8 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                             </span>
                         </div>
                     </div>
-                    <div className="p-2 flex-1">
-                        <div className="relative rounded-lg overflow-hidden bg-black aspect-[3/4]">
+                    <div className="flex-1 p-3">
+                        <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-black shadow-xl shadow-slate-900/15">
                             {proctoring.cameraStream ? (
                                 <>
                                     <video
@@ -1203,7 +1204,7 @@ export function ExamClient({ exam, user, proctoring, selfieDataUrl, idCardDataUr
                         </div>
                     </div>
 
-                    <div className="px-3 py-3 border-t border-gray-100 space-y-2 flex-shrink-0">
+                    <div className="flex-shrink-0 space-y-3 border-t border-slate-200/80 px-4 py-4">
                         <div className="flex items-center justify-between text-[11px]">
                             <span className="text-gray-400">Violations</span>
                             <span className={`font-bold ${violationCount > 0 ? 'text-red-500' : 'text-gray-700'}`}>{violationCount}/{MAX_VIOLATIONS}</span>
