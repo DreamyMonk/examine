@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { getExamSets, getSubmissionsForExam, getActiveSessionsForExam, getExamUsersByGroup } from '@/services/examService';
-import type { ExamSet, ExamSubmission, ExamUser, LiveSession } from '@/types/exam';
+import { getExamSets, getSubmissionsForExam, getExamUsersByGroup, updateSubmissionGrades } from '@/services/examService';
+import type { ExamSet, ExamSubmission, ExamUser, StudentAnswer } from '@/types/exam';
 import {
-    Loader2, ClipboardCheck, Eye, ChevronDown, ChevronUp,
-    User, Award, AlertTriangle, CheckCircle2, Clock, Users, XCircle
+    Loader2, ClipboardCheck, ChevronDown, ChevronUp,
+    Award, AlertTriangle, CheckCircle2, XCircle, Save
 } from 'lucide-react';
 
 export function SubmissionsTab() {
@@ -22,6 +23,8 @@ export function SubmissionsTab() {
     const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
     const [expandedSubmission, setExpandedSubmission] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'submitted' | 'not_submitted'>('submitted');
+    const [gradeDrafts, setGradeDrafts] = useState<Record<string, StudentAnswer[]>>({});
+    const [savingSubmissionId, setSavingSubmissionId] = useState<string | null>(null);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -37,16 +40,19 @@ export function SubmissionsTab() {
             }
         };
         fetchExams();
-    }, []);
+    }, [toast]);
+
+    const formatMarks = (marks: number) => Number.isInteger(marks) ? `${marks}` : marks.toFixed(1);
 
     const handleExamSelect = async (examId: string) => {
         setSelectedExamId(examId);
+        setExpandedSubmission(null);
+        setGradeDrafts({});
         setIsLoadingSubmissions(true);
         try {
             const data = await getSubmissionsForExam(examId);
             setSubmissions(data);
 
-            // Find users who haven't submitted
             const selectedExam = exams.find(e => e.id === examId);
             if (selectedExam && selectedExam.assignedGroups?.length > 0) {
                 const allUsers: ExamUser[] = [];
@@ -69,20 +75,77 @@ export function SubmissionsTab() {
         }
     };
 
+    const getDraftAnswers = (submission: ExamSubmission) => gradeDrafts[submission.id] || submission.answers;
+
+    const getDraftTotal = (answers: StudentAnswer[]) => answers.reduce((sum, answer) => sum + (answer.marksAwarded ?? 0), 0);
+
+    const handleToggleSubmission = (submission: ExamSubmission) => {
+        if (expandedSubmission === submission.id) {
+            setExpandedSubmission(null);
+            return;
+        }
+
+        setExpandedSubmission(submission.id);
+        setGradeDrafts(prev => ({
+            ...prev,
+            [submission.id]: prev[submission.id] || submission.answers.map(answer => ({ ...answer })),
+        }));
+    };
+
+    const handleGradeChange = (submissionId: string, answerIndex: number, rawValue: string) => {
+        setGradeDrafts(prev => {
+            const draft = (prev[submissionId] || []).map(answer => ({ ...answer }));
+            const parsed = rawValue === '' ? 0 : Number(rawValue);
+            const maxMarks = draft[answerIndex]?.marks ?? 0;
+            const bounded = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 0), maxMarks) : 0;
+            draft[answerIndex].marksAwarded = bounded;
+            return { ...prev, [submissionId]: draft };
+        });
+    };
+
+    const handleSaveGrades = async (submission: ExamSubmission) => {
+        const answers = getDraftAnswers(submission);
+        const invalid = answers.some(answer =>
+            !Number.isFinite(answer.marksAwarded ?? 0) ||
+            (answer.marksAwarded ?? 0) < 0 ||
+            (answer.marksAwarded ?? 0) > answer.marks
+        );
+
+        if (invalid) {
+            toast({ title: 'Invalid Marks', description: 'Marks awarded must stay between 0 and the question marks.', variant: 'destructive' });
+            return;
+        }
+
+        setSavingSubmissionId(submission.id);
+        try {
+            const total = getDraftTotal(answers);
+            await updateSubmissionGrades(submission.id, answers, total);
+            setSubmissions(prev => prev.map(item =>
+                item.id === submission.id
+                    ? { ...item, answers, marksObtained: total, status: 'graded' }
+                    : item
+            ));
+            toast({ title: 'Grades Saved', description: `Updated grading for ${submission.userName}.` });
+        } catch (error: any) {
+            toast({ title: 'Save Failed', description: error.message, variant: 'destructive' });
+        } finally {
+            setSavingSubmissionId(null);
+        }
+    };
+
     return (
         <div className="space-y-4">
             <div>
                 <h2 className="text-lg font-semibold text-gray-900">Exam Submissions</h2>
-                <p className="text-sm text-gray-500">View and review student answers</p>
+                <p className="text-sm text-gray-500">View, review, and grade student answers</p>
             </div>
 
-            {/* Exam Selector */}
             <div className="flex items-end gap-4">
                 <div className="space-y-1.5 flex-1 max-w-sm">
                     <Label className="text-sm font-medium text-gray-700">Select Exam</Label>
                     <Select value={selectedExamId} onValueChange={handleExamSelect}>
                         <SelectTrigger>
-                            <SelectValue placeholder="Choose an exam to view submissions" />
+                            <SelectValue placeholder={isLoadingExams ? 'Loading exams...' : 'Choose an exam to view submissions'} />
                         </SelectTrigger>
                         <SelectContent>
                             {exams.map(exam => (
@@ -95,7 +158,6 @@ export function SubmissionsTab() {
                 </div>
             </div>
 
-            {/* Toggle: Submitted / Not Submitted */}
             {selectedExamId && !isLoadingSubmissions && (
                 <div className="flex items-center gap-2">
                     <button
@@ -121,7 +183,6 @@ export function SubmissionsTab() {
                 </div>
             )}
 
-            {/* Submissions List */}
             {!selectedExamId ? (
                 <Card className="shadow-sm border border-gray-200">
                     <CardContent className="flex flex-col items-center py-12">
@@ -134,7 +195,6 @@ export function SubmissionsTab() {
                     <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
                 </div>
             ) : viewMode === 'not_submitted' ? (
-                /* ====== NOT SUBMITTED VIEW ====== */
                 notSubmittedUsers.length === 0 ? (
                     <Card className="shadow-sm border border-gray-200">
                         <CardContent className="flex flex-col items-center py-12">
@@ -178,7 +238,6 @@ export function SubmissionsTab() {
                 </Card>
             ) : (
                 <div className="space-y-2">
-                    {/* Summary */}
                     <div className="flex items-center gap-4 p-3 rounded-lg bg-blue-50 border border-blue-100 text-sm">
                         <span className="text-blue-700 font-medium">{submissions.length} submissions</span>
                         <span className="text-blue-600">
@@ -189,6 +248,7 @@ export function SubmissionsTab() {
                     {submissions.map(sub => {
                         const selectedExam = exams.find(e => e.id === selectedExamId);
                         const percentage = sub.totalMarks > 0 ? (sub.marksObtained / sub.totalMarks) * 100 : 0;
+                        const draftAnswers = getDraftAnswers(sub);
 
                         return (
                             <Card key={sub.id} className="shadow-sm border border-gray-200">
@@ -206,7 +266,7 @@ export function SubmissionsTab() {
                                         <div className="flex items-center gap-3">
                                             <div className="text-right">
                                                 <p className={`text-sm font-bold ${percentage >= 60 ? 'text-emerald-600' : percentage >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
-                                                    {sub.marksObtained}/{sub.totalMarks}
+                                                    {formatMarks(sub.marksObtained)}/{formatMarks(sub.totalMarks)}
                                                 </p>
                                                 <p className="text-[10px] text-gray-400">{percentage.toFixed(0)}%</p>
                                             </div>
@@ -225,7 +285,7 @@ export function SubmissionsTab() {
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                onClick={() => setExpandedSubmission(expandedSubmission === sub.id ? null : sub.id)}
+                                                onClick={() => handleToggleSubmission(sub)}
                                                 className="h-8 w-8 text-gray-400"
                                             >
                                                 {expandedSubmission === sub.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -233,10 +293,19 @@ export function SubmissionsTab() {
                                         </div>
                                     </div>
 
-                                    {/* Expanded answers */}
                                     {expandedSubmission === sub.id && (
                                         <div className="mt-4 pt-4 border-t border-gray-100 space-y-3 animate-fade-in">
-                                            {/* Selfie & ID */}
+                                            <div className="flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+                                                <div>
+                                                    <p className="text-sm font-medium text-blue-700">Review and grade answers</p>
+                                                    <p className="text-xs text-blue-600">Award custom marks per question. Decimal scores like 0.5 are supported.</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-xs text-blue-600">Draft total</p>
+                                                    <p className="text-lg font-bold text-blue-700">{formatMarks(getDraftTotal(draftAnswers))}/{formatMarks(sub.totalMarks)}</p>
+                                                </div>
+                                            </div>
+
                                             <div className="flex gap-3">
                                                 {sub.selfieUrl && (
                                                     <div className="space-y-1">
@@ -252,27 +321,34 @@ export function SubmissionsTab() {
                                                 )}
                                             </div>
 
-                                            {/* Answers */}
-                                            {sub.answers.map((answer, i) => {
+                                            {draftAnswers.map((answer, i) => {
                                                 const question = selectedExam?.questions.find(q => q.id === answer.questionId);
                                                 return (
-                                                    <div key={i} className="p-3 rounded-lg bg-gray-50 border border-gray-100 text-sm">
-                                                        <div className="flex items-start justify-between gap-2">
+                                                    <div key={i} className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm">
+                                                        <div className="flex items-start justify-between gap-3">
                                                             <div className="flex-1">
-                                                                <p className="text-xs text-gray-400 font-medium mb-1">Q{i + 1} · {answer.questionType === 'mcq' ? 'MCQ' : `${answer.marks} marks`}</p>
+                                                                <p className="mb-1 text-xs font-medium text-gray-400">Q{i + 1} · {answer.questionType === 'mcq' ? 'MCQ' : `${formatMarks(answer.marks)} marks`}</p>
                                                                 <p className="text-gray-700">{question?.question || 'Question not found'}</p>
                                                             </div>
-                                                            {answer.marksAwarded !== undefined && (
-                                                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${answer.marksAwarded > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
-                                                                    }`}>
-                                                                    {answer.marksAwarded}/{answer.marks}
-                                                                </span>
-                                                            )}
+                                                            <div className="w-[120px] flex-shrink-0">
+                                                                <Label className="mb-1 block text-[11px] text-gray-500">Marks Awarded</Label>
+                                                                <Input
+                                                                    type="number"
+                                                                    min={0}
+                                                                    max={answer.marks}
+                                                                    step={0.5}
+                                                                    value={answer.marksAwarded ?? 0}
+                                                                    onChange={(e) => handleGradeChange(sub.id, i, e.target.value)}
+                                                                    className="h-8 text-xs"
+                                                                />
+                                                                <p className="mt-1 text-[10px] text-gray-400">Out of {formatMarks(answer.marks)}</p>
+                                                            </div>
                                                         </div>
+
                                                         {answer.questionType === 'mcq' && question?.options && (
                                                             <div className="mt-2 space-y-1">
                                                                 {question.options.map((opt, optIdx) => (
-                                                                    <div key={optIdx} className={`flex items-center gap-2 text-xs px-2 py-1 rounded ${opt.isCorrect ? 'bg-emerald-50 text-emerald-700' :
+                                                                    <div key={optIdx} className={`flex items-center gap-2 rounded px-2 py-1 text-xs ${opt.isCorrect ? 'bg-emerald-50 text-emerald-700' :
                                                                         answer.selectedOptionIndex === optIdx ? 'bg-red-50 text-red-700' :
                                                                             'text-gray-500'
                                                                         }`}>
@@ -284,22 +360,34 @@ export function SubmissionsTab() {
                                                                 ))}
                                                             </div>
                                                         )}
+
                                                         {answer.questionType !== 'mcq' && (
-                                                            <div className="mt-2 p-2 rounded bg-white border border-gray-100 text-sm text-gray-600">
-                                                                <p className="text-xs text-gray-400 mb-1">Student&apos;s Answer:</p>
+                                                            <div className="mt-2 rounded border border-gray-100 bg-white p-2 text-sm text-gray-600">
+                                                                <p className="mb-1 text-xs text-gray-400">Student&apos;s Answer:</p>
                                                                 {answer.descriptiveAnswer ? (
                                                                     <div
                                                                         className="prose prose-sm max-w-none"
                                                                         dangerouslySetInnerHTML={{ __html: answer.descriptiveAnswer }}
                                                                     />
                                                                 ) : (
-                                                                    <span className="text-gray-300 italic">No answer provided</span>
+                                                                    <span className="italic text-gray-300">No answer provided</span>
                                                                 )}
                                                             </div>
                                                         )}
                                                     </div>
                                                 );
                                             })}
+
+                                            <div className="flex justify-end">
+                                                <Button
+                                                    onClick={() => handleSaveGrades(sub)}
+                                                    disabled={savingSubmissionId === sub.id}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                                                >
+                                                    {savingSubmissionId === sub.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                                    Save Grades
+                                                </Button>
+                                            </div>
                                         </div>
                                     )}
                                 </CardContent>

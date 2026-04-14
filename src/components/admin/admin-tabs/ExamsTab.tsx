@@ -94,7 +94,7 @@ export function ExamsTab() {
     const updateQuestion = (index: number, field: string, value: any) => {
         setQuestions(prev => {
             const updated = [...prev];
-            (updated[index] as any)[field] = value;
+            (updated[index] as any)[field] = field === 'marks' ? Number(value) : value;
             return updated;
         });
     };
@@ -152,6 +152,10 @@ export function ExamsTab() {
             const q = questions[i];
             if (!q.question.trim()) {
                 toast({ title: 'Empty Question', description: `Question ${i + 1} has no text.`, variant: 'destructive' });
+                return;
+            }
+            if (!Number.isFinite(q.marks) || q.marks <= 0) {
+                toast({ title: 'Invalid Marks', description: `Question ${i + 1} must have marks greater than 0.`, variant: 'destructive' });
                 return;
             }
             if (q.type === 'mcq') {
@@ -444,6 +448,22 @@ export function ExamsTab() {
                                                 placeholder="Enter your question..."
                                                 className="min-h-[60px] resize-none text-sm"
                                             />
+
+                                            <div className="space-y-1.5 pl-2">
+                                                <Label className="text-xs text-gray-500">Marks for this question</Label>
+                                                <div className="relative max-w-[180px]">
+                                                    <Award className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                                                    <Input
+                                                        type="number"
+                                                        min={0.5}
+                                                        step={0.5}
+                                                        value={q.marks}
+                                                        onChange={(e) => updateQuestion(qIndex, 'marks', e.target.value)}
+                                                        className="h-9 pl-8 text-sm"
+                                                    />
+                                                </div>
+                                                <p className="text-[11px] text-gray-400">You can use decimal values like 0.5, 1.5, or 2.5.</p>
+                                            </div>
 
                                             {q.type === 'mcq' && q.options && (
                                                 <div className="space-y-2 pl-2">
